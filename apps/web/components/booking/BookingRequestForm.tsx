@@ -354,6 +354,7 @@ export function BookingRequestForm() {
           budget: values.budget,
           message: values.message,
           website: values.website,
+          recaptchaAction: "booking_submit",
           ...(tokenToSubmit ? { recaptchaToken: tokenToSubmit } : {})
         })
       });

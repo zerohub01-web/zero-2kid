@@ -311,6 +311,7 @@ export function LeadCaptureWidget() {
           ]
             .filter(Boolean)
             .join(" | "),
+          recaptchaAction: "chatbot_submit",
           recaptchaToken: token
         })
       });

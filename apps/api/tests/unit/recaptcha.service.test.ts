@@ -50,17 +50,23 @@ describe("reCAPTCHA verification service", () => {
   });
 
   test("U6.9 - accepts a valid provider response", async () => {
+    process.env.CLIENT_ORIGIN = "https://zeroops.in";
+    process.env.WEB_BASE_URL = "https://www.zeroops.in";
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
         json: async () => ({
-          success: true
+          success: true,
+          action: "booking_submit",
+          hostname: "www.zeroops.in"
         })
       }))
     );
 
     const { verifyRecaptchaToken } = await import("../../src/services/recaptcha.service");
-    const result = await verifyRecaptchaToken("valid-token", "127.0.0.1");
+    const result = await verifyRecaptchaToken("valid-token", "127.0.0.1", {
+      expectedAction: "booking_submit"
+    });
 
     expect(result).toEqual({ ok: true });
   });
@@ -82,6 +88,60 @@ describe("reCAPTCHA verification service", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("captcha_invalid");
+    }
+  });
+
+  test("U6.11 - rejects tokens from unexpected hostnames", async () => {
+    process.env.CLIENT_ORIGIN = "https://zeroops.in";
+    process.env.WEB_BASE_URL = "https://www.zeroops.in";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({
+          success: true,
+          action: "booking_submit",
+          hostname: "malicious.example.com",
+          score: 0.9
+        })
+      }))
+    );
+
+    const { verifyRecaptchaToken } = await import("../../src/services/recaptcha.service");
+    const result = await verifyRecaptchaToken("valid-token", "127.0.0.1", {
+      expectedAction: "booking_submit"
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("captcha_invalid");
+      expect(result.details).toContain("unexpected-hostname");
+    }
+  });
+
+  test("U6.12 - rejects tokens with unexpected actions", async () => {
+    process.env.CLIENT_ORIGIN = "https://zeroops.in";
+    process.env.WEB_BASE_URL = "https://www.zeroops.in";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({
+          success: true,
+          action: "newsletter_signup",
+          hostname: "zeroops.in",
+          score: 0.9
+        })
+      }))
+    );
+
+    const { verifyRecaptchaToken } = await import("../../src/services/recaptcha.service");
+    const result = await verifyRecaptchaToken("valid-token", "127.0.0.1", {
+      expectedAction: "booking_submit"
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("captcha_invalid");
+      expect(result.details).toContain("unexpected-action");
     }
   });
 });

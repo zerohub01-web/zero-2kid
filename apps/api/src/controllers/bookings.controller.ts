@@ -118,9 +118,17 @@ export async function createBooking(req: Request, res: Response) {
 
   const ipAddress = getRequestIp(req);
   const recaptchaToken = String(req.body.recaptchaToken ?? "").trim();
-  const recaptchaResult = await verifyRecaptchaToken(recaptchaToken, ipAddress);
+  const recaptchaAction = String(req.body.recaptchaAction ?? "").trim();
+  const recaptchaResult = await verifyRecaptchaToken(recaptchaToken, ipAddress, {
+    expectedAction: recaptchaAction || undefined
+  });
   if (!recaptchaResult.ok) {
-    console.warn("[Booking] CAPTCHA rejected:", recaptchaResult.code, recaptchaResult.reason);
+    console.warn("[Booking] CAPTCHA rejected:", {
+      code: recaptchaResult.code,
+      reason: recaptchaResult.reason,
+      details: recaptchaResult.details ?? [],
+      action: recaptchaAction || null
+    });
     const status = recaptchaResult.code === "captcha_unavailable" ? 503 : 400;
     return res.status(status).json({
       error: recaptchaResult.reason,

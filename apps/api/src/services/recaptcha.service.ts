@@ -3,6 +3,9 @@ import { env } from "../config/env.js";
 interface RecaptchaResponse {
   success: boolean;
   score?: number;
+  action?: string;
+  hostname?: string;
+  challenge_ts?: string;
   "error-codes"?: string[];
 }
 
@@ -20,6 +23,32 @@ type RecaptchaVerificationResult =
       reason: string;
       details?: string[];
     };
+
+interface VerifyRecaptchaOptions {
+  expectedAction?: string;
+}
+
+function normalizeHostname(value: string): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  try {
+    return new URL(raw).hostname.trim().toLowerCase();
+  } catch {
+    return raw
+      .replace(/^[a-z]+:\/\//i, "")
+      .split("/")[0]
+      .split(":")[0]
+      .trim()
+      .toLowerCase();
+  }
+}
+
+function getAllowedHostnames(): string[] {
+  return Array.from(
+    new Set([env.clientOrigin, env.webBaseUrl].map((value) => normalizeHostname(value)).filter(Boolean))
+  );
+}
 
 function mapRecaptchaFailure(errorCodes: string[] = []): RecaptchaVerificationResult {
   if (errorCodes.includes("missing-input-response")) {
@@ -57,7 +86,11 @@ function mapRecaptchaFailure(errorCodes: string[] = []): RecaptchaVerificationRe
   };
 }
 
-export async function verifyRecaptchaToken(token: string, ipAddress: string) {
+export async function verifyRecaptchaToken(
+  token: string,
+  ipAddress: string,
+  options: VerifyRecaptchaOptions = {}
+) {
   if (!env.recaptchaSecretKey) {
     console.error("[reCAPTCHA] RECAPTCHA_SECRET_KEY not configured");
     return {
@@ -79,6 +112,8 @@ export async function verifyRecaptchaToken(token: string, ipAddress: string) {
     secret: env.recaptchaSecretKey,
     response: token
   });
+  const expectedAction = String(options.expectedAction ?? "").trim();
+  const allowedHostnames = getAllowedHostnames();
 
   if (ipAddress) {
     payload.set("remoteip", ipAddress);
@@ -96,11 +131,53 @@ export async function verifyRecaptchaToken(token: string, ipAddress: string) {
     const parsed = (await response.json()) as RecaptchaResponse;
 
     if (!parsed.success) {
-      console.warn("[reCAPTCHA] Provider rejected token:", parsed["error-codes"] ?? []);
+      console.warn("[reCAPTCHA] Provider rejected token:", {
+        errors: parsed["error-codes"] ?? [],
+        hostname: parsed.hostname ?? null,
+        action: parsed.action ?? null,
+        score: typeof parsed.score === "number" ? parsed.score : null,
+        expectedAction: expectedAction || null,
+        allowedHostnames
+      });
       return mapRecaptchaFailure(parsed["error-codes"] ?? []);
     }
 
+    if (expectedAction && parsed.action && parsed.action !== expectedAction) {
+      console.warn("[reCAPTCHA] Token action mismatch:", {
+        receivedAction: parsed.action,
+        expectedAction,
+        hostname: parsed.hostname ?? null
+      });
+      return {
+        ok: false as const,
+        code: "captcha_invalid" as const,
+        reason: "We couldn't verify the security check. Please try again.",
+        details: ["unexpected-action"]
+      };
+    }
+
+    const verifiedHostname = normalizeHostname(parsed.hostname ?? "");
+    if (verifiedHostname && allowedHostnames.length > 0 && !allowedHostnames.includes(verifiedHostname)) {
+      console.warn("[reCAPTCHA] Token hostname mismatch:", {
+        hostname: verifiedHostname,
+        allowedHostnames,
+        action: parsed.action ?? null
+      });
+      return {
+        ok: false as const,
+        code: "captcha_invalid" as const,
+        reason: "We couldn't verify the security check. Please try again.",
+        details: ["unexpected-hostname"]
+      };
+    }
+
     if (typeof parsed.score === "number" && parsed.score < env.recaptchaMinScore) {
+      console.warn("[reCAPTCHA] Token score below threshold:", {
+        score: parsed.score,
+        minScore: env.recaptchaMinScore,
+        hostname: parsed.hostname ?? null,
+        action: parsed.action ?? null
+      });
       return {
         ok: false as const,
         code: "captcha_invalid" as const,

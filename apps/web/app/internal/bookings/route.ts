@@ -71,6 +71,7 @@ function buildApiPayload(input: unknown): UnknownRecord {
   const date = asString(source.date);
   const website = asString(source.website);
   const recaptchaToken = asString(source.recaptchaToken);
+  const recaptchaAction = asString(source.recaptchaAction);
 
   const payload: UnknownRecord = {
     name,
@@ -85,6 +86,7 @@ function buildApiPayload(input: unknown): UnknownRecord {
   if (date) payload.date = date;
   if (website) payload.website = website;
   if (recaptchaToken) payload.recaptchaToken = recaptchaToken;
+  if (recaptchaAction) payload.recaptchaAction = recaptchaAction;
 
   return payload;
 }

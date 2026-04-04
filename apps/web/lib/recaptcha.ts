@@ -166,6 +166,12 @@ export async function executeRecaptchaAction(
     return token;
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    console.warn("[reCAPTCHA] Frontend execute failed:", {
+      action,
+      mode: "v3",
+      siteKeyConfigured: isRecaptchaSiteKeyConfigured(siteKey),
+      error: message || String(error ?? "")
+    });
     throw new Error(message || "captcha_unavailable");
   }
 }

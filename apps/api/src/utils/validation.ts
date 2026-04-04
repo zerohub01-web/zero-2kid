@@ -41,7 +41,8 @@ export const createBookingSchema = z.object({
     message: z.string().min(5).max(1200),
     date: z.string().optional(),
     website: z.string().optional().default(""),
-    recaptchaToken: z.string().optional().default("")
+    recaptchaToken: z.string().optional().default(""),
+    recaptchaAction: z.enum(["booking_submit", "chatbot_submit"]).optional()
   })
 });
 

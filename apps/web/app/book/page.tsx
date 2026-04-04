@@ -7,17 +7,20 @@ import { BookingRequestForm } from "../../components/booking/BookingRequestForm"
 export default function BookPage() {
   if (process.env.NODE_ENV === "development") {
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+    const recaptchaMode = process.env.NEXT_PUBLIC_RECAPTCHA_MODE ?? "checkbox";
     if (!siteKey || siteKey === "your_site_key_here") {
       console.warn(
         "WARNING: NEXT_PUBLIC_RECAPTCHA_SITE_KEY not set.",
-        "Booking form requires a Google reCAPTCHA v2 checkbox site key."
+        recaptchaMode === "v3"
+          ? "Booking form requires a Google reCAPTCHA v3 site key for automatic verification."
+          : "Booking form requires a Google reCAPTCHA v2 checkbox site key."
       );
     }
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL;
     if (!apiUrl) {
       console.warn(
-        "WARNING: NEXT_PUBLIC_API_URL not set.",
-        "Bookings proxy will try localhost:3001 as fallback."
+        "WARNING: NEXT_PUBLIC_API_BASE_URL not set.",
+        "Bookings proxy will fall back through local API candidates before it reaches the live API."
       );
     }
   }
