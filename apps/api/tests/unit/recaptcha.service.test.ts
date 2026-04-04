@@ -71,6 +71,29 @@ describe("reCAPTCHA verification service", () => {
     expect(result).toEqual({ ok: true });
   });
 
+  test("U6.9b - accepts www hostname when env uses apex domain", async () => {
+    process.env.CLIENT_ORIGIN = "https://zeroops.in";
+    delete process.env.WEB_BASE_URL;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({
+          success: true,
+          action: "booking_submit",
+          hostname: "www.zeroops.in",
+          score: 0.9
+        })
+      }))
+    );
+
+    const { verifyRecaptchaToken } = await import("../../src/services/recaptcha.service");
+    const result = await verifyRecaptchaToken("valid-token", "127.0.0.1", {
+      expectedAction: "booking_submit"
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
+
   test("U6.10 - rejects low-score v3 responses", async () => {
     vi.stubGlobal(
       "fetch",

@@ -44,9 +44,24 @@ function normalizeHostname(value: string): string {
   }
 }
 
+function expandEquivalentHostnames(hostname: string): string[] {
+  const normalized = normalizeHostname(hostname);
+  if (!normalized) return [];
+
+  if (normalized.startsWith("www.")) {
+    return [normalized, normalized.slice(4)].filter(Boolean);
+  }
+
+  return [normalized, `www.${normalized}`];
+}
+
 function getAllowedHostnames(): string[] {
   return Array.from(
-    new Set([env.clientOrigin, env.webBaseUrl].map((value) => normalizeHostname(value)).filter(Boolean))
+    new Set(
+      [env.clientOrigin, env.webBaseUrl]
+        .flatMap((value) => expandEquivalentHostnames(value))
+        .filter(Boolean)
+    )
   );
 }
 
