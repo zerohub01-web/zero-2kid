@@ -2,11 +2,20 @@
   "name": "@zero/web",
   "version": "1.0.0",
   "private": true,
+  "_whatsapp_strategy": "wa.me deep links - free, no SDK needed",
   "scripts": {
     "dev": "next dev",
+    "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
+    "dev:clean": "npm run clean && npm run dev",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit"
+    "lint": "eslint . --ext .ts,.tsx",
+    "test:e2e:setup": "playwright install chromium || echo Playwright browser install skipped",
+    "test:e2e:setup:all": "playwright install chromium webkit || playwright install chromium || echo Playwright browser install skipped",
+    "test:e2e": "npm run test:e2e:setup && playwright test --workers=1",
+    "test:unit": "vitest run tests/unit --pool=threads",
+    "test:all": "npm run test:unit && npm run test:e2e",
+    "test:report": "playwright show-report test-results/html"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.0",
@@ -20,16 +29,23 @@
     "react-dom": "18.3.1",
     "react-hot-toast": "^2.6.0",
     "recharts": "^2.12.7",
+    "signature_pad": "^5.1.3",
     "three": "^0.167.1",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.5.4",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
+    "eslint": "^10.1.0",
+    "globals": "^17.4.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^4.1.2"
   }
 }

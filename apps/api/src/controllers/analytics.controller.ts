@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { BookingModel } from "../models/Booking.js";
+import { BookingModel, toCanonicalBookingStatus } from "../models/Booking.js";
 
 function startOfHour() {
   const date = new Date();
@@ -81,7 +81,11 @@ export async function getAnalytics(req: Request, res: Response) {
   const emails = bookings.map((b) => b.email);
   const uniqueEmails = new Set(emails);
   const repeatCustomers = emails.length - uniqueEmails.size;
-  const conversionRate = totalBookings > 0 ? (bookings.filter((b) => b.status !== "NEW").length / totalBookings) * 100 : 0;
+  const convertedLeads = bookings.filter(
+    (booking) => (toCanonicalBookingStatus(booking.status) ?? "new") === "converted"
+  ).length;
+  const highValueLeads = bookings.filter((booking) => booking.score === "high").length;
+  const conversionRate = totalBookings > 0 ? (convertedLeads / totalBookings) * 100 : 0;
 
   const serviceCount = new Map<string, number>();
   bookings.forEach((b) => serviceCount.set(b.service, (serviceCount.get(b.service) ?? 0) + 1));
@@ -96,6 +100,7 @@ export async function getAnalytics(req: Request, res: Response) {
       revenue,
       growthPercent: Number(growthPercent.toFixed(1)),
       activeCustomers: uniqueEmails.size,
+      highValueLeads,
       conversionRate: Number(conversionRate.toFixed(1)),
       repeatCustomers,
       topService

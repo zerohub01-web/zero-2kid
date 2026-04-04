@@ -1,8 +1,8 @@
 import axios from "axios";
 
-// Route through Vercel proxy in production to avoid cross-domain third-party cookie blocking
-const isProd = process.env.NODE_ENV === "production";
-const baseURL = isProd ? "" : (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000");
+// Always use same-origin /api proxy so auth cookies persist reliably.
+// Next.js rewrites /api/* to the backend configured in next.config.js.
+const baseURL = "";
 
 export const api = axios.create({
   baseURL,

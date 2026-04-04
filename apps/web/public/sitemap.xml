@@ -6,14 +6,69 @@
     <changefreq>weekly</changefreq>
   </url>
   <url>
+    <loc>https://zeroops.in/blog</loc>
+    <priority>0.9</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/book</loc>
+    <priority>0.9</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/book-call</loc>
+    <priority>0.8</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
     <loc>https://zeroops.in/services</loc>
     <priority>0.9</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/pricing</loc>
+    <priority>0.8</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/features</loc>
+    <priority>0.8</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/technology</loc>
+    <priority>0.8</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/process</loc>
+    <priority>0.8</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/testimonials</loc>
+    <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
     <loc>https://zeroops.in/works</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/blog/digital-marketing-funnel-for-service-businesses</loc>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/blog/seo-content-plan-for-local-service-brands</loc>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://zeroops.in/blog/how-to-score-leads-and-prioritize-sales-followups</loc>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
   </url>
   <url>
     <loc>https://zeroops.in/logo.png</loc>

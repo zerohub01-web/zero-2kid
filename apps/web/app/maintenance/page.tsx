@@ -43,7 +43,7 @@ export default function MaintenancePage() {
       <SiteHeader />
 
       <section className="relative z-10 max-w-6xl mx-auto mt-8">
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Maintenance MRR</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Maintenance</p>
         <h1 className="text-5xl md:text-6xl font-display text-[var(--ink)] mt-3">Security and infrastructure care plans.</h1>
         <p className="text-[var(--muted)] mt-4 max-w-3xl">
           Every launched system needs recurring protection. These retainers protect uptime, performance, and conversion continuity.

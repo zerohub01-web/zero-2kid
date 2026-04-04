@@ -11,9 +11,23 @@
     "dev:web": "npm run dev --workspace @zero/web",
     "dev:api": "npm run dev --workspace @zero/api",
     "build": "npm run build --workspace @zero/web && npm run build --workspace @zero/api",
-    "lint": "npm run lint --workspace @zero/web && npm run lint --workspace @zero/api"
+    "lint": "npm run lint --workspace @zero/web && npm run lint --workspace @zero/api",
+    "qa:full": "powershell.exe -ExecutionPolicy Bypass -File run-full-qa.ps1"
   },
   "overrides": {
-    "three-mesh-bvh": "0.8.0"
+    "three-mesh-bvh": "0.8.0",
+    "cloudinary": {
+      "lodash": "4.18.1"
+    },
+    "recharts": {
+      "lodash": "4.18.1"
+    },
+    "express": {
+      "path-to-regexp": "0.1.13"
+    }
+  },
+  "dependencies": {
+    "lodash": "^4.18.1",
+    "path-to-regexp": "^0.1.13"
   }
 }

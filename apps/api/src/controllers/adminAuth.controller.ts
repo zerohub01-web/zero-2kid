@@ -4,6 +4,18 @@ import { signToken } from "../utils/auth.js";
 import { env } from "../config/env.js";
 import { logActivity } from "../services/activity.service.js";
 
+function shouldUseSecureCookie(req: Request) {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const isHttpsForwarded =
+    typeof forwardedProto === "string"
+      ? forwardedProto.includes("https")
+      : Array.isArray(forwardedProto)
+        ? forwardedProto.some((value) => value.includes("https"))
+        : false;
+
+  return req.secure || isHttpsForwarded;
+}
+
 export async function loginAdmin(req: Request, res: Response) {
   const { adminId, password } = req.body;
 
@@ -14,11 +26,12 @@ export async function loginAdmin(req: Request, res: Response) {
   if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
   const token = signToken({ adminId: admin.adminId, role: admin.role });
+  const secureCookie = shouldUseSecureCookie(req);
 
   res.cookie("token", token, {
     httpOnly: true,
-    secure: true,
-    sameSite: "none",
+    secure: secureCookie,
+    sameSite: secureCookie ? "none" : "lax",
     maxAge: 1000 * 60 * 60 * 24 * 7
   });
 
@@ -38,11 +51,12 @@ export async function loginAdminFromCustomer(req: Request, res: Response) {
   }
 
   const token = signToken({ adminId: customerEmail, role: "SUPER_ADMIN" });
+  const secureCookie = shouldUseSecureCookie(req);
 
   res.cookie("token", token, {
     httpOnly: true,
-    secure: env.cookieSecure,
-    sameSite: env.cookieSecure ? "none" : "lax",
+    secure: secureCookie,
+    sameSite: secureCookie ? "none" : "lax",
     maxAge: 1000 * 60 * 60 * 24 * 7
   });
 
@@ -51,8 +65,13 @@ export async function loginAdminFromCustomer(req: Request, res: Response) {
   return res.json({ adminId: customerEmail, role: "SUPER_ADMIN" });
 }
 
-export async function logoutAdmin(_req: Request, res: Response) {
-  res.clearCookie("token");
+export async function logoutAdmin(req: Request, res: Response) {
+  const secureCookie = shouldUseSecureCookie(req);
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: secureCookie,
+    sameSite: secureCookie ? "none" : "lax"
+  });
   return res.json({ ok: true });
 }
 

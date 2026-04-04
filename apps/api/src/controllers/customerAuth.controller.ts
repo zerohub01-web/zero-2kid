@@ -1,20 +1,35 @@
 import { Request, Response } from "express";
 import { OAuth2Client } from "google-auth-library";
 import { CustomerModel } from "../models/Customer.js";
-import { BookingModel } from "../models/Booking.js";
+import { BookingModel, toCanonicalBookingStatus } from "../models/Booking.js";
+import { ProjectModel } from "../models/Project.js";
 import { signCustomerToken } from "../utils/customerAuth.js";
 import { env } from "../config/env.js";
 import { ensureTimelineForBooking } from "./projectTimeline.controller.js";
 import { sendVerificationEmail, sendWelcomeEmail } from "../services/email.service.js";
 import crypto from "crypto";
+import { verifyCustomerToken } from "../utils/customerAuth.js";
 
 const googleClient = env.googleClientId ? new OAuth2Client(env.googleClientId) : null;
 
-function setCustomerCookie(res: Response, token: string) {
+function shouldUseSecureCookie(req: Request) {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const isHttpsForwarded =
+    typeof forwardedProto === "string"
+      ? forwardedProto.includes("https")
+      : Array.isArray(forwardedProto)
+        ? forwardedProto.some((value) => value.includes("https"))
+        : false;
+
+  return req.secure || isHttpsForwarded;
+}
+
+function setCustomerCookie(req: Request, res: Response, token: string) {
+  const secureCookie = shouldUseSecureCookie(req);
   res.cookie("customer_token", token, {
     httpOnly: true,
-    secure: true,
-    sameSite: "none",
+    secure: secureCookie,
+    sameSite: secureCookie ? "none" : "lax",
     maxAge: 1000 * 60 * 60 * 24 * 7
   });
 }
@@ -71,7 +86,7 @@ export async function loginCustomer(req: Request, res: Response) {
   }
 
   const token = signCustomerToken({ customerId: String(customer._id), email: customer.email });
-  setCustomerCookie(res, token);
+  setCustomerCookie(req, res, token);
 
   return res.json({ customer: { id: customer._id, name: customer.name, email: customer.email } });
 }
@@ -103,7 +118,7 @@ export async function loginWithGoogle(req: Request, res: Response) {
     }
 
     const token = signCustomerToken({ customerId: String(customer._id), email: customer.email });
-    setCustomerCookie(res, token);
+    setCustomerCookie(req, res, token);
 
     return res.json({ customer: { id: customer._id, name: customer.name, email: customer.email } });
   } catch (err: any) {
@@ -134,7 +149,7 @@ export async function verifyEmail(req: Request, res: Response) {
   sendWelcomeEmail(customer.email, customer.name).catch(console.error);
 
   const sessionToken = signCustomerToken({ customerId: String(customer._id), email: customer.email });
-  setCustomerCookie(res, sessionToken);
+  setCustomerCookie(req, res, sessionToken);
 
   return res.json({ message: "Email verified successfully", customer: { id: customer._id, name: customer.name, email: customer.email } });
 }
@@ -147,7 +162,12 @@ export async function meCustomer(req: Request, res: Response) {
 }
 
 export async function logoutCustomer(_req: Request, res: Response) {
-  res.clearCookie("customer_token");
+  const secureCookie = shouldUseSecureCookie(_req);
+  res.clearCookie("customer_token", {
+    httpOnly: true,
+    secure: secureCookie,
+    sameSite: secureCookie ? "none" : "lax"
+  });
   return res.json({ ok: true });
 }
 
@@ -155,16 +175,22 @@ export async function getCustomerProjects(req: Request, res: Response) {
   if (!req.customer) return res.status(401).json({ message: "Unauthorized" });
 
   const bookings = await BookingModel.find({ email: req.customer.email }).sort({ createdAt: -1 });
+  const projectRows = await ProjectModel.find({ leadId: { $in: bookings.map((booking) => booking._id) } });
+  const projectByLeadId = new Map(projectRows.map((project) => [String(project.leadId), project]));
+
   const projects = await Promise.all(
     bookings.map(async (b) => {
       const timeline = await ensureTimelineForBooking(String(b._id));
+      const projectRow = projectByLeadId.get(String(b._id));
       return {
         id: b._id,
         title: b.service,
-        status: b.status,
+        status: projectRow?.status ?? (toCanonicalBookingStatus(b.status) ?? "new"),
         date: b.date,
         value: b.servicePriceSnapshot,
         businessType: b.businessType,
+        proposalUrl: b.proposalUrl ?? "",
+        files: projectRow?.files ?? [],
         milestones: timeline ? timeline.toObject().milestones : []
       };
     })
@@ -200,4 +226,44 @@ export async function postClientComment(req: Request, res: Response) {
   await timeline.save();
 
   return res.json({ ok: true });
+}
+
+export async function debugCustomerSession(req: Request, res: Response) {
+  const token = req.cookies?.customer_token;
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const protocolInfo = {
+    secure: req.secure,
+    forwardedProto: typeof forwardedProto === "string" ? forwardedProto : Array.isArray(forwardedProto) ? forwardedProto.join(",") : ""
+  };
+
+  if (!token) {
+    return res.json({
+      ok: false,
+      reason: "cookie_missing",
+      hasCustomerTokenCookie: false,
+      protocol: protocolInfo
+    });
+  }
+
+  try {
+    const payload = verifyCustomerToken(token);
+    return res.json({
+      ok: true,
+      reason: "session_valid",
+      hasCustomerTokenCookie: true,
+      customer: {
+        customerId: payload.customerId,
+        email: payload.email
+      },
+      protocol: protocolInfo
+    });
+  } catch (error: any) {
+    return res.json({
+      ok: false,
+      reason: "token_invalid",
+      hasCustomerTokenCookie: true,
+      tokenError: error?.name ?? "UnknownError",
+      protocol: protocolInfo
+    });
+  }
 }

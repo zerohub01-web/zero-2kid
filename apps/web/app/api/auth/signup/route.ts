@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // build: 2026-03-10T21:44 - professional email templates v4
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "re_ZAkMN4R2_4SGRBsyeuYyWGDgKMQ3u4f1z";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM = "ZERO <noreply@noreply.zeroops.in>";
 
 export async function POST(req: NextRequest) {
@@ -13,8 +13,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Name, email, and password are required" }, { status: 400 });
     }
 
+    if (!RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
+
     // Forward signup to the backend
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "https://zero-api-m0an.onrender.com";
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "https://zero-api-m0an.onrender.com")
+      .trim()
+      .replace(/^['"]|['"]$/g, "");
     const backendRes = await fetch(`${apiBase}/api/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -57,18 +63,17 @@ export async function POST(req: NextRequest) {
     const otpExpires = Date.now() + 20 * 60 * 1000; // 20 minutes
 
     // Send OTP email via Resend
-    if (RESEND_API_KEY) {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: FROM,
-          to: email,
-          subject: "Your ZERO verification code",
-          html: `<!DOCTYPE html>
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: FROM,
+        to: email,
+        subject: "Your ZERO verification code",
+        html: `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
 <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Segoe UI',Arial,sans-serif;">
@@ -103,9 +108,8 @@ export async function POST(req: NextRequest) {
   </table>
 </body>
 </html>`,
-        }),
-      });
-    }
+      }),
+    });
 
     // Return a signed token containing the OTP state — NO cookies needed
     const token = btoa(JSON.stringify({ email, otp, otpExpires }));

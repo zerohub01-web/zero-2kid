@@ -9,6 +9,12 @@ import { publicRouter } from "./routes/public.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
+import { getProposalsDirectoryPath } from "./services/proposal.service.js";
+import { whatsappRouter } from "./routes/whatsapp.routes.js";
+import { invoiceRouter } from "./routes/invoice.routes.js";
+import { contractRouter } from "./routes/contract.routes.js";
+
+type RequestWithRawBody = express.Request & { rawBody?: string };
 
 export const app = express();
 
@@ -40,7 +46,14 @@ app.use(
     credentials: true
   })
 );
-app.use(express.json({ limit: "1mb" }));
+app.use(
+  express.json({
+    limit: "1mb",
+    verify(req, _res, buf) {
+      (req as RequestWithRawBody).rawBody = buf.toString("utf8");
+    }
+  })
+);
 app.use(cookieParser());
 app.use(mongoSanitize());
 app.use(morgan("dev"));
@@ -57,13 +70,23 @@ app.get("/", (_req, res) =>
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+app.use("/api/proposals", express.static(getProposalsDirectoryPath()));
+app.use("/api/invoices/storage", express.static("storage/invoices"));
+app.use("/api/contracts/storage", express.static("storage/contracts"));
+
 app.use("/api", publicRouter);
+app.use("/api/whatsapp", whatsappRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/reviews", reviewRoutes);
+app.use("/", invoiceRouter);
+app.use("/", contractRouter);
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  // eslint-disable-next-line no-console
-  console.error(err);
-  res.status(500).json({ message: "Internal server error", error: err.message, stack: err.stack });
+app.use((err: Error & { status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const isDev = process.env.NODE_ENV !== "production";
+  res.status(err.status || 500).json({
+    error: isDev ? err.message : "An unexpected error occurred",
+    ...(isDev && { stack: err.stack })
+  });
+  console.error("[API Error]", err.message, err.stack);
 });

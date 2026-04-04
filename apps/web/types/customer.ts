@@ -7,10 +7,25 @@
 export interface CustomerProject {
   id: string;
   title: string;
-  status: "NEW" | "CONFIRMED" | "COMPLETED";
+  status:
+    | "new"
+    | "contacted"
+    | "converted"
+    | "in_progress"
+    | "completed"
+    | "closed"
+    | "NEW"
+    | "CONFIRMED"
+    | "COMPLETED";
   date: string;
   value: number;
   businessType: string;
+  type?: string;
+  result?: string;
+  coverImage?: string;
+  createdAt?: string;
+  proposalUrl?: string;
+  files?: string[];
   milestones: {
     key: "planned" | "in_progress" | "delivered";
     title: string;

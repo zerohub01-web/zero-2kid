@@ -30,7 +30,20 @@ const tiers = [
     featured: true
   },
   {
-    name: "Premium",
+    name: "Digital Marketing Growth Ops",
+    price: "INR 9,999 - INR 49,999 / month",
+    note: "For businesses ready to scale traffic, lead quality, and conversion with a managed monthly growth engine.",
+    features: [
+      "SEO + local rank execution",
+      "Google Search + Meta ads management",
+      "Social media content operations",
+      "Monthly reporting and strategy call",
+      "Recommended ad spend: INR 9,999 - INR 199,999 / month"
+    ],
+    cta: "Start Marketing Ops"
+  },
+  {
+    name: "Digital Fortress & AI",
     price: "INR 89,999 - 1,49,999+",
     note: "Operational infrastructure for companies that need custom systems, AI, and hardened security.",
     features: [
@@ -58,7 +71,7 @@ export default function PricingPage() {
           These plans are engineered for speed and profitability: strong perceived value, tight scope control, and fast deployment cycles.
         </p>
 
-        <section className="grid md:grid-cols-3 gap-4 mt-8">
+        <section className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mt-8">
           {tiers.map((tier) => (
             <article
               key={tier.name}
@@ -69,7 +82,7 @@ export default function PricingPage() {
               <p className="text-sm text-[var(--muted)] mt-2 leading-relaxed">{tier.note}</p>
               <ul className="mt-4 space-y-2 text-sm text-[var(--ink)]">
                 {tier.features.map((feature) => (
-                  <li key={feature}>• {feature}</li>
+                  <li key={feature}>- {feature}</li>
                 ))}
               </ul>
               <a href="/book" className="mt-6 w-full inline-flex items-center justify-center rounded-xl bg-[var(--ink)] text-white py-2.5 text-sm font-semibold">

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "karthikeyan sp",
+    "email": "mrxmikkumon@gmail.com",
+    "timeSlot": "2026-04-03T04:30:00.000Z",
+    "timestamp": "2026-04-02T15:49:30.111Z",
+    "source": "internal-call-book-fallback"
+  },
+  {
+    "name": "QA Bot",
+    "email": "qa@example.com",
+    "timeSlot": "2026-04-09T10:00:00.000Z",
+    "timestamp": "2026-04-02T16:41:44.186Z",
+    "source": "internal-call-book-fallback"
+  },
+  {
+    "name": "QA Bot",
+    "email": "qa@example.com",
+    "timeSlot": "2026-04-09T11:00:00.000Z",
+    "timestamp": "2026-04-02T17:58:55.692Z",
+    "source": "internal-call-book-fallback"
+  }
+]

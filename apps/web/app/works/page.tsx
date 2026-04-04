@@ -3,7 +3,13 @@ import { SiteFooter } from "../../components/SiteFooter";
 
 export const dynamic = "force-dynamic";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://zero-api-m0an.onrender.com";
+const isProd = process.env.NODE_ENV === "production";
+const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/^['"]|['"]$/g, "");
+const API_BASE = configuredBaseUrl
+  ? configuredBaseUrl.replace(/\/$/, "")
+  : isProd
+    ? "https://zero-api-m0an.onrender.com"
+    : "http://localhost:4000";
 const TIMEOUT_MS = 8000;
 
 async function safeFetch(url: string) {
@@ -22,21 +28,8 @@ async function safeFetch(url: string) {
 }
 
 async function getWorks() {
-  const [publicWorks, adminProjects] = await Promise.all([
-    safeFetch(`${API_BASE}/api/public/work`),
-    safeFetch(`${API_BASE}/api/projects`),
-  ]);
-  // Merge by _id to avoid duplicates
-  const seen = new Set();
-  const merged: any[] = [];
-  for (const item of [...publicWorks, ...adminProjects]) {
-    const key = item._id || item.id || item.title;
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      merged.push(item);
-    }
-  }
-  return merged;
+  // Public works endpoint is enough here. Admin/project endpoints may be auth-protected.
+  return safeFetch(`${API_BASE}/api/work`);
 }
 
 export default async function WorksPage() {

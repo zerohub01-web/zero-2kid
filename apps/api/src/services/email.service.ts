@@ -1,11 +1,13 @@
 import { Resend } from "resend";
 import { env } from "../config/env.js";
+import { escapeHtml } from "../utils/sanitize.js";
+import { LeadScore } from "../models/Booking.js";
 
 const resend = env.resendApiKey ? new Resend(env.resendApiKey) : null;
 
-const FROM = "ZERO <noreply@noreply.zeroops.in>";
+const FROM = env.emailFrom;
+const PORTAL_URL = "https://zeroops.in/client-dashboard";
 
-// ─── Base layout wrapper ───────────────────────────────────────────────────────
 function layout(content: string) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -14,80 +16,71 @@ function layout(content: string) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZERO</title>
 </head>
-<body style="margin:0;padding:0;background:#0a0a0a;font-family:'Segoe UI',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#111111;border-radius:16px;overflow:hidden;border:1px solid #222;">
-        <!-- Header -->
-        <tr>
-          <td style="padding:32px 40px;background:linear-gradient(135deg,#0d0d0d 0%,#1a1a1a 100%);border-bottom:1px solid #222;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td>
-                  <div style="display:inline-block;background:#fff;border-radius:8px;padding:6px 14px;">
-                    <span style="font-size:20px;font-weight:900;letter-spacing:-1px;color:#000;">ZERO</span>
-                  </div>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <!-- Content -->
-        <tr><td style="padding:40px;">${content}</td></tr>
-        <!-- Footer -->
-        <tr>
-          <td style="padding:24px 40px;background:#0d0d0d;border-top:1px solid #222;text-align:center;">
-            <p style="color:#444;font-size:12px;margin:0 0 4px;">© 2025 ZERO. All rights reserved.</p>
-            <p style="color:#333;font-size:11px;margin:0;">
-              <a href="https://zeroops.in" style="color:#555;text-decoration:none;">zeroops.in</a>
-              &nbsp;·&nbsp;
-              <a href="https://zeroops.in/portal" style="color:#555;text-decoration:none;">Client Portal</a>
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
+<body style="margin:0;padding:0;background:#0d1117;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:28px 16px;background:#0d1117;">
+    <tr>
+      <td align="center">
+        <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;border-radius:14px;overflow:hidden;background:#111827;border:1px solid #1f2937;">
+          <tr>
+            <td style="padding:28px 32px;border-bottom:1px solid #1f2937;background:linear-gradient(140deg,#111827,#0f172a);">
+              <span style="display:inline-block;background:#ffffff;color:#0f172a;font-weight:900;padding:6px 12px;border-radius:8px;letter-spacing:0.4px;">ZERO</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:30px 32px;">${content}</td>
+          </tr>
+          <tr>
+            <td style="padding:18px 32px;border-top:1px solid #1f2937;color:#64748b;font-size:12px;">
+              ZERO automated lead notification
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
   </table>
 </body>
 </html>`;
 }
 
-// ─── Button component ─────────────────────────────────────────────────────────
-function btn(text: string, url: string) {
-  return `<a href="${url}" style="display:inline-block;margin-top:28px;padding:14px 32px;background:#fff;color:#000;font-weight:700;font-size:15px;border-radius:8px;text-decoration:none;letter-spacing:0.2px;">${text}</a>`;
-}
-
-// ─── Heading + Sub ────────────────────────────────────────────────────────────
-function heading(title: string, sub?: string) {
+function heading(title: string, subtitle?: string) {
   return `
-    <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 8px;letter-spacing:-0.5px;">${title}</h1>
-    ${sub ? `<p style="color:#888;font-size:15px;margin:0 0 24px;">${sub}</p>` : ""}
+    <h1 style="margin:0 0 8px;color:#f8fafc;font-size:24px;line-height:1.3;">${title}</h1>
+    ${subtitle ? `<p style="margin:0 0 20px;color:#94a3b8;font-size:14px;line-height:1.6;">${subtitle}</p>` : ""}
   `;
 }
 
-// ─── Divider ─────────────────────────────────────────────────────────────────
-const divider = `<div style="height:1px;background:#222;margin:28px 0;"></div>`;
-
-// ─── Info row ────────────────────────────────────────────────────────────────
 function infoRow(label: string, value: string) {
   return `
     <tr>
-      <td style="padding:10px 0;border-bottom:1px solid #1e1e1e;">
-        <span style="color:#555;font-size:13px;">${label}</span>
-        <div style="color:#e0e0e0;font-size:15px;font-weight:600;margin-top:2px;">${value}</div>
+      <td style="padding:10px 0;border-bottom:1px solid #1f2937;">
+        <div style="color:#64748b;font-size:12px;">${label}</div>
+        <div style="color:#e2e8f0;font-size:14px;font-weight:600;margin-top:2px;">${value}</div>
       </td>
     </tr>
   `;
 }
 
-// ─── sendEmail ────────────────────────────────────────────────────────────────
-export async function sendEmail(to: string, subject: string, html: string) {
+function btn(text: string, href: string) {
+  return `<a href="${href}" style="display:inline-block;margin-top:22px;padding:12px 20px;border-radius:10px;background:#f8fafc;color:#0f172a;text-decoration:none;font-weight:700;font-size:14px;">${text}</a>`;
+}
+
+export async function sendEmail(to: string, subject: string, html: string, attachments?: { filename: string; content: Buffer }[]) {
   if (!resend) {
     console.error("Email Error: Resend is not configured (missing API key)");
     return;
   }
+
   try {
-    const result = await resend.emails.send({ from: FROM, to, subject, html });
+    const result = await resend.emails.send({
+      from: FROM,
+      to,
+      subject,
+      html,
+      attachments: attachments?.map((file) => ({
+        filename: file.filename,
+        content: file.content
+      }))
+    });
     if (result.error) {
       console.error(`Email delivery failed to ${to}:`, result.error);
     } else {
@@ -98,156 +91,327 @@ export async function sendEmail(to: string, subject: string, html: string) {
   }
 }
 
-// ─── 1. OTP Verification ─────────────────────────────────────────────────────
 export async function sendVerificationEmail(to: string, otpCode: string) {
   await sendEmail(
     to,
     "Your ZERO verification code",
     layout(`
-      ${heading("Verify your account", "Enter the code below to complete your sign-up.")}
-      <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:32px;text-align:center;margin:8px 0 24px;">
-        <p style="color:#888;font-size:13px;margin:0 0 16px;text-transform:uppercase;letter-spacing:2px;">Your code</p>
-        <div style="font-size:40px;font-weight:900;letter-spacing:14px;color:#fff;font-family:'Courier New',monospace;">${otpCode}</div>
-        <p style="color:#555;font-size:12px;margin:16px 0 0;">Expires in 20 minutes</p>
+      ${heading("Verify your account", "Enter this code to complete your sign-up.")}
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:24px;text-align:center;">
+        <p style="margin:0;color:#94a3b8;font-size:12px;letter-spacing:1.8px;text-transform:uppercase;">Code</p>
+        <p style="margin:12px 0 0;color:#f8fafc;font-size:36px;letter-spacing:8px;font-weight:900;font-family:'Courier New',monospace;">${escapeHtml(
+          otpCode
+        )}</p>
       </div>
-      <p style="color:#666;font-size:13px;margin:0;">If you didn't request this, you can safely ignore this email.</p>
     `)
   );
 }
 
-// ─── 2. Welcome Email ─────────────────────────────────────────────────────────
 export async function sendWelcomeEmail(to: string, name: string) {
   await sendEmail(
     to,
-    "Welcome to ZERO — Your portal is ready",
+    "Welcome to ZERO",
     layout(`
-      ${heading(`Welcome, ${name}! 👋`)}
-      <p style="color:#aaa;font-size:15px;line-height:1.7;margin:0 0 24px;">
-        Your ZERO client portal is ready. From here you can track your projects, view milestones, 
-        review files, and communicate with our team — all in one place.
+      ${heading(`Welcome, ${escapeHtml(name)}`, "Your client portal is now ready.")}
+      <p style="margin:0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        You can now track projects, milestones, and updates in one place.
       </p>
-      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #222;border-radius:10px;overflow:hidden;margin-bottom:8px;">
-        <tr><td style="background:#1a1a1a;padding:14px 20px;">
-          <div style="color:#fff;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">What you can do</div>
-        </td></tr>
-        <tr><td style="padding:16px 20px;">
-          <p style="color:#888;font-size:14px;margin:0 0 10px;">✦ &nbsp;Track your project milestones in real-time</p>
-          <p style="color:#888;font-size:14px;margin:0 0 10px;">✦ &nbsp;View and download project deliverables</p>
-          <p style="color:#888;font-size:14px;margin:0 0 10px;">✦ &nbsp;Leave comments directly on project phases</p>
-          <p style="color:#888;font-size:14px;margin:0;">✦ &nbsp;Get instant email updates at every milestone</p>
-        </td></tr>
-      </table>
-      ${btn("Go to my portal", "https://zeroops.in/portal")}
+      ${btn("Open Client Portal", PORTAL_URL)}
     `)
   );
 }
 
-// ─── 3. Booking Created (Client) ──────────────────────────────────────────────
 export async function sendBookingCreatedEmails(params: {
   customerEmail: string;
   customerName: string;
   service: string;
-  date: string;
+  bookingId: string;
+  message: string;
+  businessType: string;
+  phone: string;
+  budget?: number | null;
+  score: LeadScore;
+  trackingUrl: string;
+  adminUrl: string;
+  ipAddress: string;
 }) {
+  const customerName = escapeHtml(params.customerName);
+  const customerEmail = escapeHtml(params.customerEmail);
+  const service = escapeHtml(params.service);
+  const bookingId = escapeHtml(params.bookingId);
+  const message = escapeHtml(params.message);
+  const businessType = escapeHtml(params.businessType);
+  const phone = escapeHtml(params.phone);
+  const budget =
+    typeof params.budget === "number" ? `INR ${params.budget.toLocaleString()}` : "Not provided";
+  const score = escapeHtml(params.score.toUpperCase());
+  const trackingUrl = escapeHtml(params.trackingUrl);
+  const adminUrl = escapeHtml(params.adminUrl);
+  const ipAddress = escapeHtml(params.ipAddress || "Unknown");
+
   await Promise.all([
-    // Client email
     sendEmail(
       params.customerEmail,
-      "ZERO — Booking received! We'll be in touch.",
+      "Your request has been received",
       layout(`
-        ${heading("Booking received!", "Thanks for choosing ZERO. We've got your request.")}
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #222;border-radius:10px;overflow:hidden;margin-bottom:8px;">
-          ${infoRow("Service", params.service)}
-          ${infoRow("Date Requested", params.date)}
-          ${infoRow("Client", params.customerName)}
-          ${infoRow("Status", "Under Review")}
+        ${heading("Request received", "Thank you for contacting ZERO.")}
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+          ${infoRow("Lead ID", bookingId)}
+          ${infoRow("Service", service)}
+          ${infoRow("Status", "New")}
         </table>
-        <p style="color:#888;font-size:14px;line-height:1.7;margin:20px 0 0;">
-          Our team will review your booking and get back to you within 1–2 business days 
-          with a confirmation and next steps. You can track your project's progress from your client portal.
+        <p style="margin:18px 0 0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+          Your request has been received. We will contact you soon.
         </p>
-        ${btn("View my portal", "https://zeroops.in/portal")}
+        ${btn("Track Status", trackingUrl)}
       `)
     ),
-    // Admin email
     sendEmail(
       env.adminNotifyEmail,
-      `⚡ New booking: ${params.service} — ${params.customerName}`,
+      "New lead received",
       layout(`
-        ${heading("New booking received", "A new client has submitted a booking request.")}
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #222;border-radius:10px;overflow:hidden;margin-bottom:8px;">
-          ${infoRow("Client Name", params.customerName)}
-          ${infoRow("Client Email", params.customerEmail)}
-          ${infoRow("Service Requested", params.service)}
-          ${infoRow("Date Requested", params.date)}
+        ${heading("New lead received", "A new public lead entered the automation pipeline.")}
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+          ${infoRow("Lead ID", bookingId)}
+          ${infoRow("Name", customerName)}
+          ${infoRow("Email", customerEmail)}
+          ${infoRow("Phone", phone)}
+          ${infoRow("Business Type", businessType)}
+          ${infoRow("Service", service)}
+          ${infoRow("Budget", budget)}
+          ${infoRow("Lead Score", score)}
+          ${infoRow("Message", message)}
+          ${infoRow("IP Address", ipAddress)}
         </table>
-        ${btn("Go to Admin Panel", "https://zeroops.in/zero-control")}
+        ${btn("Open Admin Dashboard", adminUrl)}
       `)
     )
   ]);
 }
 
-// ─── 4. Booking Status Update (Confirmed or Completed) ───────────────────────
-export async function sendBookingStatusEmail(params: {
+export async function sendProposalEmail(params: {
   customerEmail: string;
   customerName: string;
-  status: "CONFIRMED" | "COMPLETED";
   service: string;
+  bookingId: string;
+  proposalUrl: string;
 }) {
-  const isConfirmed = params.status === "CONFIRMED";
   await sendEmail(
     params.customerEmail,
-    isConfirmed
-      ? `ZERO — Your booking for ${params.service} is confirmed!`
-      : `ZERO — Your project "${params.service}" is complete!`,
+    "Here is your proposal",
     layout(`
-      ${heading(
-        isConfirmed ? "You're confirmed! 🎉" : "Project complete! 🏁",
-        isConfirmed
-          ? "Your booking has been approved and your project is starting soon."
-          : "Your project has been successfully completed."
-      )}
-      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #222;border-radius:10px;overflow:hidden;margin-bottom:8px;">
-        ${infoRow("Service", params.service)}
-        ${infoRow("Status", params.status)}
-        ${infoRow("Client", params.customerName)}
+      ${heading("Your ZERO proposal is ready", `Hi ${escapeHtml(params.customerName)}, here is your proposal.`)}
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Lead ID", escapeHtml(params.bookingId))}
+        ${infoRow("Service", escapeHtml(params.service))}
       </table>
-      <p style="color:#888;font-size:14px;line-height:1.7;margin:20px 0 0;">
-        ${isConfirmed
-          ? "Our team will be in contact shortly to kick things off. You can follow along with every step of the process from your client portal."
-          : "Thank you for working with ZERO. You can download all project deliverables from your client portal."}
+      <p style="margin:18px 0 0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        Review the proposal and reply if you want us to proceed with implementation.
       </p>
-      ${btn("View Project Progress", "https://zeroops.in/portal")}
+      ${btn("View Proposal", escapeHtml(params.proposalUrl))}
     `)
   );
 }
 
-// ─── 5. Milestone Update ──────────────────────────────────────────────────────
-const MILESTONE_META: Record<string, { emoji: string; headline: string; body: string }> = {
+export async function sendClientCredentialsEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  plainPassword: string;
+}) {
+  await sendEmail(
+    params.customerEmail,
+    "Your client portal credentials",
+    layout(`
+      ${heading("Client portal access enabled", `Hi ${escapeHtml(params.customerName)}, your account is ready.`)}
+      <p style="margin:0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        Your lead was converted to a client account. Use the credentials below to sign in.
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Login URL", "https://zeroops.in/client-login")}
+        ${infoRow("Email", escapeHtml(params.customerEmail))}
+        ${infoRow("Temporary Password", escapeHtml(params.plainPassword))}
+      </table>
+      <p style="margin:14px 0 0;color:#94a3b8;font-size:12px;">
+        Please change your password after first login.
+      </p>
+    `)
+  );
+}
+
+export async function sendLeadFollowUpEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  bookingId: string;
+}) {
+  await sendEmail(
+    params.customerEmail,
+    "Just checking if you're still interested",
+    layout(`
+      ${heading("Quick follow-up", `Hi ${escapeHtml(params.customerName)}, we wanted to check in.`)}
+      <p style="margin:0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        Just checking if you're still interested in moving forward with your ZERO request.
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Lead ID", escapeHtml(params.bookingId))}
+      </table>
+    `)
+  );
+}
+
+export async function sendLeadDayOneFollowUpEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  bookingId: string;
+}) {
+  await sendEmail(
+    params.customerEmail,
+    "Quick follow-up from ZERO",
+    layout(`
+      ${heading("Day 1 follow-up", `Hi ${escapeHtml(params.customerName)}, we're checking in.`)}
+      <p style="margin:0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        We wanted to see if you had any questions before we proceed further.
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Lead ID", escapeHtml(params.bookingId))}
+      </table>
+    `)
+  );
+}
+
+export async function sendLeadFinalReminderEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  bookingId: string;
+}) {
+  await sendEmail(
+    params.customerEmail,
+    "Final reminder from ZERO",
+    layout(`
+      ${heading("Final reminder", `Hi ${escapeHtml(params.customerName)}, this is our final check-in.`)}
+      <p style="margin:0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        If you're still interested, simply reply to this email and we'll prioritize your project.
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Lead ID", escapeHtml(params.bookingId))}
+      </table>
+      ${btn("Open Client Portal", PORTAL_URL)}
+    `)
+  );
+}
+
+export async function sendBookingStatusEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  status: "contacted" | "converted";
+  service: string;
+  bookingId: string;
+}) {
+  const isContacted = params.status === "contacted";
+  const subject = isContacted ? "Lead Update: Contacted" : "Lead Update: Converted";
+  const title = isContacted ? "We have contacted you" : "Lead marked as converted";
+  const subtitle = isContacted
+    ? "Our team has reviewed your request and reached out."
+    : "Great news. Your lead has moved to converted status.";
+
+  await sendEmail(
+    params.customerEmail,
+    subject,
+    layout(`
+      ${heading(title, subtitle)}
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Lead ID", escapeHtml(params.bookingId))}
+        ${infoRow("Service", escapeHtml(params.service))}
+        ${infoRow("Client", escapeHtml(params.customerName))}
+        ${infoRow("Status", isContacted ? "Contacted" : "Converted")}
+      </table>
+    `)
+  );
+}
+
+export async function sendBookingFeeQuoteEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  bookingId: string;
+  service: string;
+  quotedFee: number;
+}) {
+  const quotedFee = `INR ${params.quotedFee.toLocaleString()}`;
+
+  await sendEmail(
+    params.customerEmail,
+    "Your project fee estimate from ZERO",
+    layout(`
+      ${heading("Project fee estimate ready", `Hi ${escapeHtml(params.customerName)}, we reviewed your request.`)}
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Lead ID", escapeHtml(params.bookingId))}
+        ${infoRow("Service", escapeHtml(params.service))}
+        ${infoRow("Estimated Fee", escapeHtml(quotedFee))}
+      </table>
+      <p style="margin:18px 0 0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        Reply to this email or contact us on WhatsApp to confirm next steps.
+      </p>
+      ${btn("Open Client Portal", PORTAL_URL)}
+    `)
+  );
+}
+
+export async function sendCallBookingConfirmationEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  timeSlot: Date;
+}) {
+  await sendEmail(
+    params.customerEmail,
+    "Your ZERO call is booked",
+    layout(`
+      ${heading("Call confirmed", `Hi ${escapeHtml(params.customerName)}, your call is scheduled.`)}
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Time Slot", escapeHtml(params.timeSlot.toLocaleString()))}
+      </table>
+      <p style="margin:18px 0 0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        We will email you a reminder before the call.
+      </p>
+    `)
+  );
+}
+
+export async function sendCallReminderEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  timeSlot: Date;
+}) {
+  await sendEmail(
+    params.customerEmail,
+    "Reminder: Your ZERO call is coming up",
+    layout(`
+      ${heading("Call reminder", `Hi ${escapeHtml(params.customerName)}, your ZERO call is coming up soon.`)}
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f2937;border-radius:10px;overflow:hidden;">
+        ${infoRow("Time Slot", escapeHtml(params.timeSlot.toLocaleString()))}
+      </table>
+    `)
+  );
+}
+
+const MILESTONE_META: Record<string, { headline: string; body: string }> = {
   planning: {
-    emoji: "📋",
-    headline: "Planning phase has started",
-    body: "Our team is actively planning your project. This includes scoping, resource allocation, and setting up your project timeline."
+    headline: "Planning phase started",
+    body: "We are defining project scope and milestones."
   },
   development: {
-    emoji: "⚙️",
-    headline: "Development has started",
-    body: "We've kicked off the build phase of your project. Our team is now actively working on delivering your solution."
+    headline: "Development started",
+    body: "Build work has started on your project."
   },
   review: {
-    emoji: "🔍",
-    headline: "Your project is ready for review",
-    body: "We've completed a build cycle and your project is ready for internal review. We'll be in touch soon with a preview or update."
+    headline: "Ready for review",
+    body: "A build cycle is complete and under review."
   },
   launch: {
-    emoji: "🚀",
-    headline: "Project is being launched",
-    body: "Your project is going live! Our team is handling the final deployment and handoff steps."
+    headline: "Launch in progress",
+    body: "Deployment and final checks are underway."
   },
   completed: {
-    emoji: "✅",
-    headline: "Project complete!",
-    body: "Your project has been marked as complete. All deliverables are now available in your client portal. Thank you for choosing ZERO."
+    headline: "Project completed",
+    body: "Your project is complete and deliverables are available."
   }
 };
 
@@ -257,28 +421,23 @@ export async function sendMilestoneUpdateEmail(params: {
   milestoneTitle: string;
   status: "PENDING" | "DONE";
 }) {
-  if (params.status !== "DONE") return; // Only send on completion
+  if (params.status !== "DONE") return;
 
   const key = params.milestoneTitle.toLowerCase();
-  const meta = Object.entries(MILESTONE_META).find(([k]) => key.includes(k))?.[1] ?? {
-    emoji: "📌",
+  const meta = Object.entries(MILESTONE_META).find(([candidate]) => key.includes(candidate))?.[1] ?? {
     headline: `Milestone updated: ${params.milestoneTitle}`,
-    body: `The milestone "${params.milestoneTitle}" has been marked as complete. Check your portal for more details.`
+    body: `The milestone "${params.milestoneTitle}" has been marked as complete.`
   };
 
   await sendEmail(
     params.customerEmail,
-    `ZERO — ${meta.headline}`,
+    `ZERO Update: ${meta.headline}`,
     layout(`
-      <div style="font-size:40px;margin-bottom:16px;">${meta.emoji}</div>
-      ${heading(meta.headline, `Hi ${params.customerName}, here's an update on your project.`)}
-      <div style="background:#1a1a1a;border-left:3px solid #fff;border-radius:4px;padding:16px 20px;margin:0 0 24px;">
-        <p style="color:#aaa;font-size:14px;line-height:1.8;margin:0;">${meta.body}</p>
-      </div>
-      <p style="color:#666;font-size:13px;line-height:1.7;margin:0 0 4px;">
-        Milestone: <strong style="color:#888;">${params.milestoneTitle}</strong>
+      ${heading(meta.headline, `Hi ${escapeHtml(params.customerName)}, here is your latest update.`)}
+      <p style="margin:0;color:#cbd5e1;font-size:14px;line-height:1.7;">
+        ${escapeHtml(meta.body)}
       </p>
-      ${btn("Track My Project", "https://zeroops.in/portal")}
+      ${btn("Open Client Portal", PORTAL_URL)}
     `)
   );
 }

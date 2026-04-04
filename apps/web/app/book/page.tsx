@@ -1,97 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import axios from "axios";
-import { api } from "../../lib/api";
-import { SiteHeader } from "../../components/SiteHeader";
 import { SiteFooter } from "../../components/SiteFooter";
-import toast from "react-hot-toast";
+import { SiteHeader } from "../../components/SiteHeader";
+import { BookingRequestForm } from "../../components/booking/BookingRequestForm";
 
 export default function BookPage() {
-  const [sending, setSending] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [services, setServices] = useState<{ _id: string; title: string }[]>([]);
-
-  useEffect(() => {
-    api.get("/api/services").then((res) => setServices(res.data)).catch(() => setServices([]));
-  }, []);
-
-  async function handleBooking(formData: FormData) {
-    setSending(true);
-    setError(null);
-    const payload = {
-      name: String(formData.get("name")),
-      email: String(formData.get("email")),
-      phone: String(formData.get("phone")),
-      businessType: String(formData.get("businessType")),
-      currentWorkflow: String(formData.get("currentWorkflow")),
-      teamSize: String(formData.get("teamSize") ?? ""),
-      service: String(formData.get("service")),
-      date: new Date().toISOString()
-    };
-
-    try {
-      await api.post("/api/bookings", payload);
-      setDone(true);
-      toast.success("Booking submitted!");
-    } catch (err: any) {
-      console.error("Booking Error:", err.response?.data || err.message);
-      // @ts-ignore
-      window.DEBUG_BOOKING_ERROR = err.response?.data || err.message;
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Unable to process booking.";
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setSending(false);
+  if (process.env.NODE_ENV === "development") {
+    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+    if (!siteKey || siteKey === "your_site_key_here") {
+      console.warn(
+        "WARNING: NEXT_PUBLIC_RECAPTCHA_SITE_KEY not set.",
+        "Booking form will work without reCAPTCHA in dev mode."
+      );
+    }
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      console.warn(
+        "WARNING: NEXT_PUBLIC_API_URL not set.",
+        "Bookings proxy will try localhost:3001 as fallback."
+      );
     }
   }
 
   return (
     <main className="min-h-screen relative overflow-hidden px-6 md:px-10 py-8">
-      <div className="orb orb-a" /><div className="orb orb-b" />
+      <div className="orb orb-a" />
+      <div className="orb orb-b" />
+
       <SiteHeader />
-      <section id="book" className="relative z-10 max-w-6xl mx-auto mt-8 pb-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Book</p>
-        <h1 className="text-5xl md:text-6xl font-display text-[var(--ink)] mt-3">Get your free automation audit.</h1>
+
+      <section className="relative z-10 max-w-5xl mx-auto mt-8 pb-10">
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Public Booking</p>
+        <h1 className="text-5xl md:text-6xl font-display text-[var(--ink)] mt-3">Request your free consultation.</h1>
+        <p className="text-sm md:text-base text-[var(--muted)] mt-4 max-w-2xl">
+          Submit your requirement without login. We validate each request in real time and protect this form
+          with anti-spam controls.
+        </p>
+
+        <div className="mt-5 grid sm:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-xl border border-black/10 bg-white/70 px-4 py-3">
+            <p className="font-semibold text-[var(--ink)]">No login required</p>
+            <p className="mt-1 text-[var(--muted)]">Fast form submission in under 2 minutes.</p>
+          </div>
+          <div className="rounded-xl border border-black/10 bg-white/70 px-4 py-3">
+            <p className="font-semibold text-[var(--ink)]">Real team follow-up</p>
+            <p className="mt-1 text-[var(--muted)]">Email and WhatsApp updates after your request.</p>
+          </div>
+          <div className="rounded-xl border border-black/10 bg-white/70 px-4 py-3">
+            <p className="font-semibold text-[var(--ink)]">Track your request</p>
+            <p className="mt-1 text-[var(--muted)]">Get a lead ID to check status anytime.</p>
+          </div>
+        </div>
+
         <div className="soft-card p-6 md:p-8 mt-8">
-          {done ? (
-            <p className="text-[var(--accent)] font-semibold">Booking created. Confirmation and admin notification were triggered.</p>
-          ) : (
-            <form action={handleBooking} className="grid gap-4">
-              <input name="name" required placeholder="Full name" className="field py-3" />
-              <div className="grid md:grid-cols-2 gap-4">
-                <input name="email" type="email" required placeholder="Work email" className="field py-3" />
-                <input name="phone" required placeholder="Phone number" className="field py-3" />
-              </div>
-              <input name="businessType" required placeholder="Business Type & Industry" className="field py-3" />
-              <textarea name="currentWorkflow" required placeholder="Describe your workflow and bottlenecks" className="field py-3 min-h-[100px] resize-y" />
-              <div className="grid md:grid-cols-2 gap-4">
-                <select name="teamSize" className="field py-3" defaultValue=""><option value="" disabled>Team size</option><option value="1-10">1-10</option><option value="11-50">11-50</option><option value="51-200">51-200</option><option value="200+">200+</option></select>
-                <select name="service" required className="field py-3">
-                  <option value="">Select service</option>
-                  {services.length > 0 ? (
-                    services.map((s)=><option key={s._id} value={s.title}>{s.title}</option>)
-                  ) : (
-                    <>
-                      <option value="Basic">Basic</option>
-                      <option value="Plus">Plus</option>
-                      <option value="Premium">Premium</option>
-                      <option value="Maintenance MRR plan">Maintenance MRR plan</option>
-                    </>
-                  )}
-                </select>
-              </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
-              <button disabled={sending} className="btn-primary py-3.5 text-sm disabled:opacity-70">{sending ? "Processing..." : "Submit Booking"}</button>
-            </form>
-          )}
+          <BookingRequestForm />
         </div>
       </section>
+
       <SiteFooter />
     </main>
   );
 }
-
-
-

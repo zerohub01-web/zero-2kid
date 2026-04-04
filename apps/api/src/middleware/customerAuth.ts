@@ -13,6 +13,10 @@ export function requireCustomerAuth(req: Request, res: Response, next: NextFunct
 
   try {
     const payload = verifyCustomerToken(token);
+    if (payload.token_type !== "customer" || !payload.customerId) {
+      return res.status(403).json({ error: "Customer access required" });
+    }
+
     req.customer = { customerId: payload.customerId, email: payload.email };
     next();
   } catch {

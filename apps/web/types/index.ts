@@ -1,4 +1,5 @@
-export type BookingStatus = "NEW" | "CONFIRMED" | "COMPLETED";
+export type BookingStatus = "new" | "contacted" | "converted" | "closed" | "NEW" | "CONFIRMED" | "COMPLETED";
+export type LeadScore = "high" | "medium" | "low";
 
 export interface Booking {
   _id: string;
@@ -6,6 +7,11 @@ export interface Booking {
   email: string;
   phone: string;
   businessType: string;
+  bookingId?: string;
+  message?: string;
+  budget?: number | null;
+  score?: LeadScore;
+  proposalUrl?: string;
   teamSize?: string;
   monthlyLeads?: string;
   budgetRange?: string;
@@ -29,6 +35,7 @@ export interface AnalyticsResponse {
     revenue: number;
     growthPercent: number;
     activeCustomers: number;
+    highValueLeads: number;
     conversionRate: number;
     repeatCustomers: number;
     topService: string;

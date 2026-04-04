@@ -1,0 +1,191 @@
+import { Request, Response } from "express";
+import { CallBookingModel } from "../models/CallBooking.js";
+import {
+  sendCallBookingConfirmationEmail,
+  sendCallReminderEmail
+} from "../services/email.service.js";
+import { sanitizeEmail, sanitizeSingleLine } from "../utils/sanitize.js";
+
+const SLOT_INTERVAL_MINUTES = 30;
+const START_HOUR = 10;
+const END_HOUR = 18;
+
+function getDateRange(dateInput?: string) {
+  const base = dateInput ? new Date(`${dateInput}T00:00:00`) : new Date();
+  if (Number.isNaN(base.getTime())) return null;
+
+  const start = new Date(base);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+function buildSlotsForDate(date: Date) {
+  const slots: Date[] = [];
+  const day = new Date(date);
+
+  for (let hour = START_HOUR; hour < END_HOUR; hour += 1) {
+    for (let minute = 0; minute < 60; minute += SLOT_INTERVAL_MINUTES) {
+      const slot = new Date(day);
+      slot.setHours(hour, minute, 0, 0);
+      slots.push(slot);
+    }
+  }
+
+  return slots;
+}
+
+export async function getAvailableCallSlots(req: Request, res: Response) {
+  const dateQuery = typeof req.query.date === "string" ? req.query.date : undefined;
+  const range = getDateRange(dateQuery);
+  if (!range) {
+    return res.status(400).json({ message: "Invalid date query format." });
+  }
+
+  const slots = buildSlotsForDate(range.start);
+  const now = new Date();
+
+  const bookedCalls = await CallBookingModel.find({
+    timeSlot: { $gte: range.start, $lt: range.end },
+    status: { $ne: "cancelled" }
+  }).select("timeSlot");
+  const bookedIsoSet = new Set(bookedCalls.map((call) => new Date(call.timeSlot).toISOString()));
+
+  return res.json({
+    date: range.start.toISOString().slice(0, 10),
+    slots: slots.map((slot) => {
+      const iso = slot.toISOString();
+      const available = slot > now && !bookedIsoSet.has(iso);
+      return {
+        timeSlot: iso,
+        label: slot.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        available
+      };
+    })
+  });
+}
+
+export async function createCallBooking(req: Request, res: Response) {
+  const name = sanitizeSingleLine(req.body.name, 80);
+  const email = sanitizeEmail(req.body.email);
+  const rawTimeSlot = String(req.body.timeSlot ?? "");
+  const timeSlot = new Date(rawTimeSlot);
+
+  if (Number.isNaN(timeSlot.getTime())) {
+    return res.status(400).json({ message: "Invalid timeslot." });
+  }
+
+  if (timeSlot <= new Date()) {
+    return res.status(400).json({ message: "Please choose a future timeslot." });
+  }
+
+  const existing = await CallBookingModel.findOne({
+    timeSlot,
+    status: { $ne: "cancelled" }
+  }).select("_id");
+  if (existing) {
+    return res.status(409).json({ message: "This timeslot has already been booked." });
+  }
+
+  const booking = await CallBookingModel.create({
+    name,
+    email,
+    timeSlot,
+    status: "booked"
+  });
+
+  void sendCallBookingConfirmationEmail({
+    customerEmail: booking.email,
+    customerName: booking.name,
+    timeSlot: booking.timeSlot
+  }).catch((error) => {
+    console.error("Call confirmation email failed:", error);
+  });
+
+  return res.status(201).json({
+    message: "Call booked successfully.",
+    booking: {
+      id: String(booking._id),
+      name: booking.name,
+      email: booking.email,
+      timeSlot: booking.timeSlot,
+      status: booking.status
+    }
+  });
+}
+
+export async function getCallBookings(req: Request, res: Response) {
+  const status = typeof req.query.status === "string" ? req.query.status : "";
+  const query: Record<string, unknown> = {};
+
+  if (status && status !== "all") {
+    if (!["booked", "completed", "cancelled"].includes(status)) {
+      return res.status(400).json({ message: "Invalid call status filter." });
+    }
+    query.status = status;
+  }
+
+  const rows = await CallBookingModel.find(query).sort({ timeSlot: 1 }).limit(500);
+  return res.json(
+    rows.map((row) => ({
+      id: String(row._id),
+      name: row.name,
+      email: row.email,
+      timeSlot: row.timeSlot,
+      status: row.status,
+      reminderSentAt: row.reminderSentAt
+    }))
+  );
+}
+
+export async function updateCallBookingStatus(req: Request, res: Response) {
+  const booking = await CallBookingModel.findByIdAndUpdate(
+    req.params.id,
+    { status: req.body.status },
+    { new: true }
+  );
+  if (!booking) {
+    return res.status(404).json({ message: "Call booking not found." });
+  }
+
+  return res.json({
+    id: String(booking._id),
+    name: booking.name,
+    email: booking.email,
+    timeSlot: booking.timeSlot,
+    status: booking.status,
+    reminderSentAt: booking.reminderSentAt
+  });
+}
+
+export async function processUpcomingCallReminders() {
+  const now = new Date();
+  const reminderFrom = new Date(now.getTime() + 45 * 60 * 1000);
+  const reminderTo = new Date(now.getTime() + 75 * 60 * 1000);
+
+  const pending = await CallBookingModel.find({
+    status: "booked",
+    reminderSentAt: null,
+    timeSlot: { $gte: reminderFrom, $lte: reminderTo }
+  }).limit(100);
+
+  if (pending.length === 0) return;
+
+  const tasks = pending.map(async (booking) => {
+    try {
+      await sendCallReminderEmail({
+        customerEmail: booking.email,
+        customerName: booking.name,
+        timeSlot: booking.timeSlot
+      });
+      booking.reminderSentAt = new Date();
+      await booking.save();
+    } catch (error) {
+      console.error("Call reminder email failed:", error);
+    }
+  });
+
+  await Promise.allSettled(tasks);
+}

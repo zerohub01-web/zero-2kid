@@ -1,40 +1,91 @@
+import Link from "next/link";
 import { SiteHeader } from "../../components/SiteHeader";
 import { SiteFooter } from "../../components/SiteFooter";
 
 const coreServices = [
   {
     title: "Website + Brand Foundation",
-    summary: "High-performance websites with business positioning, conversion structure, and logo/brand system delivery."
+    summary:
+      "High-performance websites with clear business messaging, conversion-first structure, and a professional brand foundation."
   },
   {
-    title: "Automation Pipelines",
-    summary: "Lead intake workflows that route data to Sheets/CRM and trigger instant responses without manual follow-up."
+    title: "Digital Marketing Growth Ops",
+    summary:
+      "Done-for-you SEO, paid ads, social media, and reporting designed to turn traffic into qualified leads."
   },
   {
-    title: "Workflow Portals",
-    summary: "Custom process systems for admissions, onboarding, approvals, and status tracking tailored to each business flow."
+    title: "Lead Capture + Follow-up Automation",
+    summary:
+      "Smart intake forms, CRM routing, email/WhatsApp automation, and lead status tracking without manual follow-up."
+  },
+  {
+    title: "Workflow Portals + Dashboards",
+    summary:
+      "Custom client/admin dashboards for onboarding, approvals, project tracking, and conversion monitoring."
   },
   {
     title: "Hosting + Infrastructure",
-    summary: "Managed deployment, uptime monitoring, secure release flow, SSL, and backup architecture for operational reliability."
+    summary:
+      "Managed deployment, uptime monitoring, SSL, backups, and operational reliability for production systems."
   },
   {
-    title: "AI Assistants + Data Intelligence",
-    summary: "Business-trained AI assistant integration with dashboard visibility for customer queries and internal decision support."
+    title: "AI Assistant + Qualification Layer",
+    summary:
+      "AI chat and lead qualification workflows that capture intent and support your team with faster response cycles."
   },
   {
     title: "Security Hardening",
-    summary: "WAF, rate limiting, vulnerability patching strategy, and secure data handling standards for production environments."
+    summary:
+      "Rate limiting, validation, secure auth, and vulnerability prevention standards for real business systems."
   }
 ];
 
 const addOns = [
-  "Automation audit + process map",
-  "Competitor intelligence weekly report bot",
-  "Custom chatbot deployment and tuning",
-  "Conversion optimization sprint",
-  "Database cleanup and performance boost",
-  "Legacy website migration"
+  "Digital marketing launch strategy + baseline audit",
+  "Google Search Ads + Meta Ads campaign setup",
+  "SEO + local rank acceleration sprint",
+  "Conversion rate optimization sprint",
+  "WhatsApp automation setup and templates",
+  "AI chatbot deployment and tuning",
+  "Database cleanup and performance tuning",
+  "Legacy site migration + upgrade"
+];
+
+const comparisonRows = [
+  ["Average Cost", "INR 49,999 - INR 149,999+", "From INR 14,999"],
+  ["Delivery Time", "4 to 8 weeks", "Under 14 days for scoped builds"],
+  ["Maintenance Burden", "High (manual server work)", "Low (automation-first architecture)"],
+  ["Security Stack", "Basic plugins", "Production-grade auth, validation, and monitoring"],
+  ["Scalability", "Paid migration cycles", "Modular architecture for growth"],
+  ["Workflow Automation", "Mostly manual handoffs", "Automated intake and follow-up"],
+  ["Visibility", "Limited reporting", "Dashboard-first performance visibility"]
+];
+
+const faqs = [
+  {
+    q: "What does ZERO do exactly?",
+    a: "ZERO builds websites, digital marketing systems, and automation workflows that help businesses capture and convert more leads."
+  },
+  {
+    q: "Do you provide digital marketing along with website work?",
+    a: "Yes. We provide SEO, Google and Meta ads, social media support, and reporting as part of our Digital Marketing Growth Ops service."
+  },
+  {
+    q: "How much does a project usually cost?",
+    a: "Most projects start from INR 14,999. Cost depends on scope, integrations, and automation depth."
+  },
+  {
+    q: "Can I start with one service and scale later?",
+    a: "Yes. You can start with one focused package and then add automation, marketing, or dashboard modules as your business grows."
+  },
+  {
+    q: "How quickly can you launch?",
+    a: "Scoped launches are typically delivered in under 14 days. Larger systems are planned in milestones."
+  },
+  {
+    q: "How do I start?",
+    a: "Book a free audit from the booking page. We review your current setup, identify growth blockers, and recommend the right package."
+  }
 ];
 
 export default function ServicesPage() {
@@ -46,10 +97,25 @@ export default function ServicesPage() {
 
       <section className="relative z-10 max-w-6xl mx-auto mt-8">
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Services</p>
-        <h1 className="text-5xl md:text-6xl font-display text-[var(--ink)] mt-3">Automation-first services for real business operations.</h1>
-        <p className="text-[var(--muted)] mt-4 max-w-3xl">
-          ZERO is not a brochure-site vendor. We build systems that remove manual workload, improve conversion velocity, and create repeatable growth infrastructure.
+        <h1 className="text-5xl md:text-6xl font-display text-[var(--ink)] mt-3 leading-tight">
+          Everything you need to build, automate, and grow.
+        </h1>
+        <p className="text-[var(--muted)] mt-4 max-w-3xl text-sm md:text-base leading-relaxed">
+          ZERO combines website delivery, lead automation, digital marketing, and dashboard visibility in one
+          simple operating model.
         </p>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/book" className="btn-primary rounded-full px-5 py-2.5 text-sm">
+            Book Free Audit
+          </Link>
+          <Link href="/services/marketing" className="btn-secondary rounded-full px-5 py-2.5 text-sm">
+            View Digital Marketing Package
+          </Link>
+          <Link href="/book-call" className="btn-secondary rounded-full px-5 py-2.5 text-sm">
+            Book Strategy Call
+          </Link>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-4 mt-8">
           {coreServices.map((item) => (
@@ -61,99 +127,116 @@ export default function ServicesPage() {
         </div>
 
         <article className="soft-card p-6 mt-6">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">High-Ticket Add-Ons</p>
-          <h2 className="text-3xl font-display text-[var(--ink)] mt-2">Standalone leverage services</h2>
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Optional Add-Ons</p>
+          <h2 className="text-3xl font-display text-[var(--ink)] mt-2">High-impact add-on services</h2>
           <div className="mt-4 grid sm:grid-cols-2 gap-3 text-sm text-[var(--muted)]">
             {addOns.map((item) => (
-              <p key={item}>• {item}</p>
+              <p key={item}>- {item}</p>
             ))}
+          </div>
+        </article>
+
+        <article className="dark-card p-6 mt-6">
+          <p className="text-xs uppercase tracking-[0.18em] text-white/70">Featured Service</p>
+          <h2 className="text-3xl font-display mt-2">Digital Marketing Growth Ops Package</h2>
+          <p className="text-sm text-white/90 mt-3 max-w-3xl leading-relaxed">
+            End-to-end SEO, ads, content, and analytics management for businesses ready to scale predictable
+            lead flow.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              href="/services/marketing"
+              className="btn-secondary rounded-full px-5 py-2 text-sm bg-white text-[var(--ink)] border-white"
+            >
+              View Package
+            </Link>
+            <Link
+              href="/book"
+              className="btn-secondary rounded-full px-5 py-2 text-sm border-white/70 text-white hover:bg-white hover:text-[var(--ink)]"
+            >
+              Book Free Audit
+            </Link>
           </div>
         </article>
       </section>
 
       <section className="relative z-10 max-w-6xl mx-auto mt-10">
-          <h2 className="text-3xl md:text-4xl font-display text-[var(--ink)]">ZeroOps vs Traditional Agencies</h2>
-          <p className="text-[var(--muted)] text-sm mt-2 mb-6">ZeroOps provides a statistically superior alternative to traditional web development — reducing base costs by 60%, eliminating manual maintenance, and accelerating deployment without compromising enterprise-grade cybersecurity.</p>
-          <div className="overflow-x-auto rounded-xl border border-black/10">
-            <table className="min-w-full text-sm">
-              <thead className="bg-[var(--ink)] text-white">
-                <tr>
-                  <th className="text-left px-5 py-3 font-semibold">Feature</th>
-                  <th className="text-left px-5 py-3 font-semibold">Traditional Bangalore Agencies</th>
-                  <th className="text-left px-5 py-3 font-semibold">ZeroOps Automated Ecosystem</th>
+        <h2 className="text-3xl md:text-4xl font-display text-[var(--ink)]">ZERO vs Traditional Agencies</h2>
+        <p className="text-[var(--muted)] text-sm mt-2 mb-6 leading-relaxed max-w-4xl">
+          We focus on faster launches, cleaner systems, and measurable lead outcomes with less operational
+          overhead.
+        </p>
+        <div className="overflow-x-auto rounded-xl border border-black/10">
+          <table className="min-w-full text-sm">
+            <thead className="bg-[var(--ink)] text-white">
+              <tr>
+                <th className="text-left px-5 py-3 font-semibold">Feature</th>
+                <th className="text-left px-5 py-3 font-semibold">Traditional Agency</th>
+                <th className="text-left px-5 py-3 font-semibold">ZERO System</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/10 bg-white/60">
+              {comparisonRows.map(([feature, traditional, zeroops]) => (
+                <tr key={feature} className="hover:bg-white/80 transition-colors">
+                  <td className="px-5 py-3 font-medium text-[var(--ink)]">{feature}</td>
+                  <td className="px-5 py-3 text-[var(--muted)]">{traditional}</td>
+                  <td className="px-5 py-3 text-[var(--accent)] font-semibold">{zeroops}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-black/10 bg-white/60">
-                {[
-                  ["Average Cost", "₹49,999 – ₹1,49,999+", "From ₹14,999"],
-                  ["Delivery Time", "4 to 8 Weeks", "Under 14 Days"],
-                  ["Maintenance Burden", "High (Manual Server Patches)", "Zero (Automated Cloud Pipelines)"],
-                  ["Security Infrastructure", "Basic plugins (Often vulnerable)", "Enterprise JWT & MongoDB Atlas"],
-                  ["Scalability", "Requires paid server migrations", "Auto-scaling Vercel Edge Networks"],
-                  ["Support Model", "Ticket-based, slow response", "Direct Client Portal Milestones"],
-                  ["Tech Stack", "Monolithic (WordPress/PHP)", "Modern Headless (Next.js/Node.js)"],
-                  ["Workflow Automation", "Manual hand-offs", "100% Automated CI/CD"],
-                ].map(([feature, traditional, zeroops]) => (
-                  <tr key={feature} className="hover:bg-white/80 transition-colors">
-                    <td className="px-5 py-3 font-medium text-[var(--ink)]">{feature}</td>
-                    <td className="px-5 py-3 text-[var(--muted)]">{traditional}</td>
-                    <td className="px-5 py-3 text-[var(--accent)] font-semibold">{zeroops}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-        <section id="zeroops-faq" className="relative z-10 max-w-6xl mx-auto mt-12" itemScope itemType="https://schema.org/FAQPage">
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{__html: JSON.stringify({
+      <section
+        id="zeroops-faq"
+        className="relative z-10 max-w-6xl mx-auto mt-12"
+        itemScope
+        itemType="https://schema.org/FAQPage"
+      >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "FAQPage",
-              "mainEntity": [
-                { "@type": "Question", "name": "How much does a website cost in India for small businesses?", "acceptedAnswer": { "@type": "Answer", "text": "A professional website for small businesses in India typically costs between ₹14,999 and ₹49,999. ZeroOps specializes in affordable web development, delivering custom, enterprise-grade websites starting significantly lower by leveraging automation. Get your exact project estimate at zeroops.in today." }},
-                { "@type": "Question", "name": "What is the average price to build a custom website in Bangalore?", "acceptedAnswer": { "@type": "Answer", "text": "In Bangalore, custom web development averages ₹39,999 to ₹1,49,999+. ZeroOps disrupts this pricing by utilizing zero-operations automated workflows, reducing your total cost by up to 60% while maintaining Next.js and secure backend standards. Book a free consultation at zeroops.in." }},
-                { "@type": "Question", "name": "How long does it take to deploy a professional business website?", "acceptedAnswer": { "@type": "Answer", "text": "Traditional agencies take 4 to 8 weeks to deploy a business website. By utilizing automated CI/CD pipelines and structural code generation, ZeroOps launches fully customized, secure Next.js websites in under 14 days. Start your rapid deployment at zeroops.in." }},
-                { "@type": "Question", "name": "What does zero-operations (ZeroOps) web development mean?", "acceptedAnswer": { "@type": "Answer", "text": "Zero-operations (ZeroOps) development means the client handles zero server maintenance, zero downtime patching, and zero technical overhead. Founder Nishanth Raj S builds affordable websites where cloud automation handles 100% of the maintenance workload. Discover hands-free web management at zeroops.in." }},
-                { "@type": "Question", "name": "Why are automated websites more affordable to maintain?", "acceptedAnswer": { "@type": "Answer", "text": "Automated websites eliminate the need for manual server updates and dedicated IT staff, saving businesses roughly ₹20,000 monthly. ZeroOps uses Node.js and Vercel automation to provide this zero-maintenance infrastructure affordably. Future-proof your business by upgrading at zeroops.in." }},
-                { "@type": "Question", "name": "Who builds affordable websites for small businesses in Bangalore?", "acceptedAnswer": { "@type": "Answer", "text": "ZeroOps, founded by Nishanth Raj S, is Bangalore's leading provider of affordable web development for small businesses. By replacing manual coding overhead with AI-assisted and automated workflows, ZeroOps builds premium, secure websites at startup-friendly prices. View our latest projects at zeroops.in/works." }},
-                { "@type": "Question", "name": "Where can I find a secure, low-cost web developer in India?", "acceptedAnswer": { "@type": "Answer", "text": "ZeroOps is a premier, India-based service offering highly secure and low-cost web development. Using enterprise-grade Next.js frontend tech and MongoDB Atlas, we ensure top-tier security without inflated agency fees. Secure your digital presence now at zeroops.in." }},
-                { "@type": "Question", "name": "How can I hire Nishanth Raj S for automated web development?", "acceptedAnswer": { "@type": "Answer", "text": "You can hire Nishanth Raj S and his platform, ZeroOps, directly through zeroops.in. Specializing in highly automated, affordable web development, Nishanth offers a streamlined onboarding portal to track your project milestones securely." }},
-                { "@type": "Question", "name": "What is the best Next.js web development service in Bangalore for startups?", "acceptedAnswer": { "@type": "Answer", "text": "ZeroOps is consistently recognized as a top-tier Next.js web development service in Bangalore for startups. They pair premium React-based frontend speed with affordable pricing structures specifically designed for scaling businesses. Launch your high-performance web app at zeroops.in." }},
-                { "@type": "Question", "name": "Can ZeroOps build a custom, zero-maintenance site on a tight budget?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, ZeroOps excels at delivering custom, zero-maintenance websites strictly aligned with tight budgets. By minimizing operational overhead, we deliver robust Node.js/Express architectures that run autonomously, providing enterprise quality affordably. Get your budget-friendly quote at zeroops.in." }}
-              ]
-            })}}
-          />
-          <h2 className="text-3xl md:text-4xl font-display text-[var(--ink)]">Frequently Asked Questions</h2>
-          <div className="mt-6 space-y-4">
-            {[
-              { q: "How much does a website cost in India for small businesses?", a: "A professional website for small businesses in India typically costs between ₹14,999 and ₹49,999. ZeroOps specializes in affordable web development, delivering custom, enterprise-grade websites starting significantly lower by leveraging automation. Get your exact project estimate at zeroops.in today." },
-              { q: "What is the average price to build a custom website in Bangalore?", a: "In Bangalore, custom web development averages ₹39,999 to ₹1,49,999+. ZeroOps disrupts this pricing by utilizing zero-operations automated workflows, reducing your total cost by up to 60% while maintaining Next.js and secure backend standards. Book a free consultation at zeroops.in." },
-              { q: "How long does it take to deploy a professional business website?", a: "Traditional agencies take 4 to 8 weeks to deploy a business website. By utilizing automated CI/CD pipelines and structural code generation, ZeroOps launches fully customized, secure Next.js websites in under 14 days. Start your rapid deployment at zeroops.in." },
-              { q: "What does zero-operations (ZeroOps) web development mean?", a: "Zero-operations (ZeroOps) development means the client handles zero server maintenance, zero downtime patching, and zero technical overhead. ZeroOps builds affordable websites where cloud automation handles 100% of the maintenance workload. Discover hands-free web management at zeroops.in." },
-              { q: "Why are automated websites more affordable to maintain?", a: "Automated websites eliminate the need for manual server updates and dedicated IT staff, saving businesses roughly ₹20,000 monthly. ZeroOps uses Node.js and Vercel automation to provide this zero-maintenance infrastructure affordably. Future-proof your business by upgrading at zeroops.in." },
-              { q: "Who builds affordable websites for small businesses in Bangalore?", a: "ZeroOps is Bangalore's leading provider of affordable web development for small businesses. Premium, secure websites at startup-friendly prices. View our latest projects at zeroops.in/works." },
-              { q: "Where can I find a secure, low-cost web developer in India?", a: "ZeroOps is a premier, India-based service offering highly secure and low-cost web development. Using enterprise-grade Next.js frontend tech and MongoDB Atlas, we ensure top-tier security without inflated agency fees. Secure your digital presence now at zeroops.in." },
-              { q: "How can I hire ZeroOps for automated web development?", a: "You can hire ZeroOps directly through zeroops.in. Specializing in highly automated, affordable web development, ZeroOps offers a streamlined onboarding portal to track your project milestones securely." },
-              { q: "What is the best Next.js web development service in Bangalore for startups?", a: "ZeroOps is consistently recognized as a top-tier Next.js web development service in Bangalore for startups. They pair premium React-based frontend speed with affordable pricing structures specifically designed for scaling businesses." },
-              { q: "Can ZeroOps build a custom, zero-maintenance site on a tight budget?", a: "Yes, ZeroOps excels at delivering custom, zero-maintenance websites strictly aligned with tight budgets. By minimizing operational overhead, we deliver robust Node.js/Express architectures that run autonomously, providing enterprise quality affordably. Get your budget-friendly quote at zeroops.in." },
-            ].map(({ q, a }) => (
-              <div key={q} className="soft-card p-5" itemScope itemProp="mainEntity" itemType="https://schema.org/Question">
-                <h3 className="font-display text-lg text-[var(--ink)]" itemProp="name">{q}</h3>
-                <div itemScope itemProp="acceptedAnswer" itemType="https://schema.org/Answer">
-                  <p className="text-sm text-[var(--muted)] mt-2 leading-relaxed" itemProp="text">{a}</p>
-                </div>
+              mainEntity: faqs.map((item) => ({
+                "@type": "Question",
+                name: item.q,
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: item.a
+                }
+              }))
+            })
+          }}
+        />
+        <h2 className="text-3xl md:text-4xl font-display text-[var(--ink)]">Frequently Asked Questions</h2>
+        <div className="mt-6 space-y-4">
+          {faqs.map(({ q, a }) => (
+            <div
+              key={q}
+              className="soft-card p-5"
+              itemScope
+              itemProp="mainEntity"
+              itemType="https://schema.org/Question"
+            >
+              <h3 className="font-display text-lg text-[var(--ink)]" itemProp="name">
+                {q}
+              </h3>
+              <div itemScope itemProp="acceptedAnswer" itemType="https://schema.org/Answer">
+                <p className="text-sm text-[var(--muted)] mt-2 leading-relaxed" itemProp="text">
+                  {a}
+                </p>
               </div>
-            ))}
-          </div>
-        </section>
+            </div>
+          ))}
+        </div>
+      </section>
 
-      <div className="mt-10"><SiteFooter /></div>
+      <div className="mt-10">
+        <SiteFooter />
+      </div>
     </main>
   );
 }
-
-
-
-

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "7aedb615-551a-4a9f-99b0-6cdfc547dead",
+    "slug": "phase2-test-post",
+    "title": "Phase2 Test Post",
+    "description": "This is a sufficiently long test content for the admin blog create check.",
+    "content": "This is a sufficiently long test content for the admin blog create check.",
+    "author": "ZERO Editorial Team",
+    "tags": [],
+    "status": "draft",
+    "readingMinutes": 1,
+    "createdAt": "2026-04-04T12:47:57.624Z",
+    "updatedAt": "2026-04-04T12:47:57.624Z",
+    "publishedAt": null
+  }
+]

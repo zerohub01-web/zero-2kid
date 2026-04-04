@@ -64,21 +64,29 @@ export async function updateMilestone(req: Request, res: Response) {
   await timeline.save();
 
   if (statusChanged) {
-    await sendMilestoneUpdateEmail({
-      customerEmail: timeline.customerEmail,
-      customerName: timeline.customerName,
-      milestoneTitle: milestone.title,
-      status: milestone.status
-    });
+    try {
+      await sendMilestoneUpdateEmail({
+        customerEmail: timeline.customerEmail,
+        customerName: timeline.customerName,
+        milestoneTitle: milestone.title,
+        status: milestone.status
+      });
+    } catch (error) {
+      console.error("Milestone status email failed:", error);
+    }
   }
 
-  await logActivity("PROJECT_MILESTONE_UPDATED", req.admin?.adminId ?? "system", {
-    bookingId,
-    milestoneKey,
-    status,
-    hasFile: Boolean(fileUrl),
-    hasComment: Boolean(comment)
-  });
+  try {
+    await logActivity("PROJECT_MILESTONE_UPDATED", req.admin?.adminId ?? "system", {
+      bookingId,
+      milestoneKey,
+      status,
+      hasFile: Boolean(fileUrl),
+      hasComment: Boolean(comment)
+    });
+  } catch (error) {
+    console.error("Milestone activity log failed:", error);
+  }
 
   return res.json(timeline);
 }

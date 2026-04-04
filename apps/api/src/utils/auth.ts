@@ -2,8 +2,8 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { JwtPayload, Role } from "../types/auth.js";
 
-export function signToken(payload: JwtPayload) {
-  return jwt.sign(payload, env.jwtSecret, {
+export function signToken(payload: Omit<JwtPayload, "token_type">) {
+  return jwt.sign({ ...payload, token_type: "admin" }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn as jwt.SignOptions["expiresIn"]
   });
 }

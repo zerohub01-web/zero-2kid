@@ -18,6 +18,7 @@ async function seed() {
 
   const defaults = [
     { title: "Brand Operating System", price: 2500, isActive: true },
+    { title: "Digital Marketing Growth Ops", price: 30000, isActive: true },
     { title: "Automation Architecture", price: 3500, isActive: true },
     { title: "Growth Intelligence Stack", price: 4200, isActive: true }
   ];
