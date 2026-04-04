@@ -1,11 +1,13 @@
 export const RECAPTCHA_PLACEHOLDER_SITE_KEY = "your_site_key_here";
-const RECAPTCHA_SCRIPT_ID = "recaptcha-checkbox-script";
+const RECAPTCHA_SCRIPT_ID_PREFIX = "recaptcha-script";
 
 export type CaptchaErrorCode =
   | "captcha_required"
   | "captcha_invalid"
   | "captcha_expired"
   | "captcha_unavailable";
+
+export type RecaptchaMode = "checkbox" | "v3";
 
 export type RecaptchaWidgetState = "idle" | "loading" | "ready" | "verified" | "expired" | "error";
 
@@ -15,10 +17,16 @@ export interface RecaptchaWidgetStatus {
   code?: CaptchaErrorCode;
 }
 
-let recaptchaScriptPromise: Promise<void> | null = null;
+const recaptchaScriptPromises = new Map<RecaptchaMode, Promise<void>>();
 
 export function getRecaptchaSiteKey(): string {
   return (process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? "").trim();
+}
+
+export function getRecaptchaMode(): RecaptchaMode {
+  const rawMode = (process.env.NEXT_PUBLIC_RECAPTCHA_MODE ?? "").trim().toLowerCase();
+  if (rawMode === "v3" || rawMode === "score" || rawMode === "invisible") return "v3";
+  return "checkbox";
 }
 
 export function isRecaptchaSiteKeyConfigured(siteKey = getRecaptchaSiteKey()): boolean {
@@ -58,7 +66,14 @@ export function getCaptchaErrorMessage(code?: string, fallback?: string): string
   }
 }
 
-export function loadRecaptchaScript(siteKey = getRecaptchaSiteKey()): Promise<void> {
+function getScriptId(mode: RecaptchaMode) {
+  return `${RECAPTCHA_SCRIPT_ID_PREFIX}-${mode}`;
+}
+
+export function loadRecaptchaScript(
+  siteKey = getRecaptchaSiteKey(),
+  mode: RecaptchaMode = getRecaptchaMode()
+): Promise<void> {
   if (!isRecaptchaSiteKeyConfigured(siteKey)) {
     return Promise.reject(new Error("captcha_unavailable"));
   }
@@ -67,7 +82,7 @@ export function loadRecaptchaScript(siteKey = getRecaptchaSiteKey()): Promise<vo
     return Promise.reject(new Error("captcha_unavailable"));
   }
 
-  if (window.grecaptcha?.render) {
+  if (window.grecaptcha?.render && (mode === "checkbox" || window.grecaptcha.execute)) {
     return new Promise<void>((resolve) => {
       const grecaptcha = window.grecaptcha;
       if (!grecaptcha) {
@@ -79,14 +94,15 @@ export function loadRecaptchaScript(siteKey = getRecaptchaSiteKey()): Promise<vo
     });
   }
 
-  if (recaptchaScriptPromise) {
-    return recaptchaScriptPromise;
+  const existingPromise = recaptchaScriptPromises.get(mode);
+  if (existingPromise) {
+    return existingPromise;
   }
 
-  recaptchaScriptPromise = new Promise<void>((resolve, reject) => {
+  const scriptPromise = new Promise<void>((resolve, reject) => {
     const onReady = () => {
       if (!window.grecaptcha?.ready) {
-        recaptchaScriptPromise = null;
+        recaptchaScriptPromises.delete(mode);
         reject(new Error("captcha_unavailable"));
         return;
       }
@@ -95,11 +111,11 @@ export function loadRecaptchaScript(siteKey = getRecaptchaSiteKey()): Promise<vo
     };
 
     const onError = () => {
-      recaptchaScriptPromise = null;
+      recaptchaScriptPromises.delete(mode);
       reject(new Error("captcha_unavailable"));
     };
 
-    const existingScript = document.getElementById(RECAPTCHA_SCRIPT_ID) as HTMLScriptElement | null;
+    const existingScript = document.getElementById(getScriptId(mode)) as HTMLScriptElement | null;
     if (existingScript) {
       if (window.grecaptcha?.render) {
         onReady();
@@ -112,8 +128,11 @@ export function loadRecaptchaScript(siteKey = getRecaptchaSiteKey()): Promise<vo
     }
 
     const script = document.createElement("script");
-    script.id = RECAPTCHA_SCRIPT_ID;
-    script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+    script.id = getScriptId(mode);
+    script.src =
+      mode === "checkbox"
+        ? "https://www.google.com/recaptcha/api.js?render=explicit"
+        : `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(siteKey)}`;
     script.async = true;
     script.defer = true;
     script.addEventListener("load", onReady, { once: true });
@@ -121,5 +140,32 @@ export function loadRecaptchaScript(siteKey = getRecaptchaSiteKey()): Promise<vo
     document.head.appendChild(script);
   });
 
-  return recaptchaScriptPromise;
+  recaptchaScriptPromises.set(mode, scriptPromise);
+  return scriptPromise;
+}
+
+export async function executeRecaptchaAction(
+  action: string,
+  siteKey = getRecaptchaSiteKey()
+): Promise<string> {
+  if (!isRecaptchaSiteKeyConfigured(siteKey)) {
+    throw new Error("captcha_unavailable");
+  }
+
+  await loadRecaptchaScript(siteKey, "v3");
+
+  if (!window.grecaptcha?.execute) {
+    throw new Error("captcha_unavailable");
+  }
+
+  try {
+    const token = await window.grecaptcha.execute(siteKey, { action });
+    if (!token) {
+      throw new Error("captcha_invalid");
+    }
+    return token;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    throw new Error(message || "captcha_unavailable");
+  }
 }

@@ -64,4 +64,24 @@ describe("reCAPTCHA verification service", () => {
 
     expect(result).toEqual({ ok: true });
   });
+
+  test("U6.10 - rejects low-score v3 responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({
+          success: true,
+          score: 0.1
+        })
+      }))
+    );
+
+    const { verifyRecaptchaToken } = await import("../../src/services/recaptcha.service");
+    const result = await verifyRecaptchaToken("valid-token", "127.0.0.1");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("captcha_invalid");
+    }
+  });
 });

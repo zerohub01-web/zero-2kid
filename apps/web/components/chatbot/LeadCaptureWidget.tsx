@@ -2,7 +2,12 @@
 
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Send, X } from "lucide-react";
-import { extractCaptchaErrorCode, getCaptchaErrorMessage } from "../../lib/recaptcha";
+import {
+  executeRecaptchaAction,
+  extractCaptchaErrorCode,
+  getCaptchaErrorMessage,
+  getRecaptchaMode
+} from "../../lib/recaptcha";
 import { RecaptchaCheckbox, RecaptchaCheckboxHandle } from "../security/RecaptchaCheckbox";
 
 type StepType = "text" | "options";
@@ -226,6 +231,7 @@ export function LeadCaptureWidget() {
   const recaptchaRef = useRef<RecaptchaCheckboxHandle | null>(null);
 
   const currentStep = useMemo(() => CHAT_STEPS[currentStepIndex], [currentStepIndex]);
+  const recaptchaMode = getRecaptchaMode();
 
   const adminWhatsAppNumber =
     (process.env.NEXT_PUBLIC_ADMIN_WHATSAPP ?? "918590464379").replace(/\D/g, "") || "918590464379";
@@ -413,14 +419,26 @@ export function LeadCaptureWidget() {
       await wait(1000);
       setIsTyping(false);
       setPendingSubmission(newAnswers);
-      setAwaitingCaptcha(true);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "bot",
-          text: "Almost done. Complete the security check below, then send your request."
+      if (recaptchaMode === "checkbox") {
+        setAwaitingCaptcha(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "bot",
+            text: "Almost done. Complete the security check below, then send your request."
+          }
+        ]);
+      } else {
+        setMessages((prev) => [...prev, { role: "bot", text: "Perfect. Processing your details now..." }]);
+        try {
+          const token = await executeRecaptchaAction("chatbot_submit");
+          await handleFinalSubmit(newAnswers, token);
+        } catch (error) {
+          const code = error instanceof Error ? error.message : "captcha_unavailable";
+          setMessages((prev) => [...prev, { role: "bot", text: `❌ ${getCaptchaErrorMessage(code)}` }]);
+          setCanRetry(true);
         }
-      ]);
+      }
       return;
     }
 
@@ -499,6 +517,19 @@ export function LeadCaptureWidget() {
 
   const handleCaptchaSubmit = async () => {
     if (!pendingSubmission || isSubmitting) return;
+
+    if (recaptchaMode === "v3") {
+      setMessages((prev) => [...prev, { role: "bot", text: "Perfect. Processing your details now..." }]);
+      try {
+        const token = await executeRecaptchaAction("chatbot_submit");
+        await handleFinalSubmit(pendingSubmission, token);
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "captcha_unavailable";
+        setMessages((prev) => [...prev, { role: "bot", text: `❌ ${getCaptchaErrorMessage(code)}` }]);
+        setCanRetry(true);
+      }
+      return;
+    }
 
     if (!captchaToken) {
       setMessages((prev) => [
@@ -661,7 +692,7 @@ export function LeadCaptureWidget() {
             </div>
           ) : null}
 
-          {awaitingCaptcha && !isSubmitted && !isTyping ? (
+          {recaptchaMode === "checkbox" && awaitingCaptcha && !isSubmitted && !isTyping ? (
             <div className="input-area captcha-panel">
               <div className="captcha-card">
                 <p className="captcha-title">Security Check</p>

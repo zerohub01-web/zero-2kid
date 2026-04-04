@@ -100,6 +100,15 @@ export async function verifyRecaptchaToken(token: string, ipAddress: string) {
       return mapRecaptchaFailure(parsed["error-codes"] ?? []);
     }
 
+    if (typeof parsed.score === "number" && parsed.score < env.recaptchaMinScore) {
+      return {
+        ok: false as const,
+        code: "captcha_invalid" as const,
+        reason: "We couldn't verify the security check. Please try again.",
+        details: ["low-score"]
+      };
+    }
+
     return { ok: true as const };
   } catch (error) {
     console.error("[reCAPTCHA] Verification failed:", error);

@@ -7,7 +7,9 @@ import { api } from "../../lib/api";
 import { trackEvent } from "../../lib/analytics";
 import {
   RecaptchaWidgetStatus,
+  executeRecaptchaAction,
   extractCaptchaErrorCode,
+  getRecaptchaMode,
   getCaptchaErrorMessage
 } from "../../lib/recaptcha";
 import { buildAdminPing, buildWhatsAppLink } from "../../utils/whatsapp";
@@ -224,6 +226,7 @@ export function BookingRequestForm() {
     message: ""
   });
   const recaptchaRef = useRef<RecaptchaCheckboxHandle | null>(null);
+  const recaptchaMode = getRecaptchaMode();
 
   const errors = useMemo(() => validateForm(values), [values]);
   const isValid = Object.values(errors).every((error) => !error);
@@ -312,7 +315,21 @@ export function BookingRequestForm() {
       return;
     }
 
-    if (!recaptchaToken) {
+    let tokenToSubmit = recaptchaToken;
+
+    if (recaptchaMode === "v3") {
+      try {
+        tokenToSubmit = await executeRecaptchaAction("booking_submit");
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "captcha_unavailable";
+        const message = getCaptchaErrorMessage(code);
+        setSubmitErrors([message]);
+        toast.error(message);
+        return;
+      }
+    }
+
+    if (!tokenToSubmit) {
       const message = getCaptchaErrorMessage(
         captchaStatus.code ?? (captchaStatus.state === "expired" ? "captcha_expired" : "captcha_required")
       );
@@ -337,7 +354,7 @@ export function BookingRequestForm() {
           budget: values.budget,
           message: values.message,
           website: values.website,
-          ...(recaptchaToken ? { recaptchaToken } : {})
+          ...(tokenToSubmit ? { recaptchaToken: tokenToSubmit } : {})
         })
       });
 
@@ -623,19 +640,27 @@ Thank you for choosing ZeroOps! ${SYMBOLS.rocket}
       <div className="rounded-xl border border-black/10 bg-white/70 px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">Security Check</p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          Complete the CAPTCHA before submitting so we can block spam and route your request to the team.
+          {recaptchaMode === "checkbox"
+            ? "Complete the CAPTCHA before submitting so we can block spam and route your request to the team."
+            : "Security verification will run automatically when you submit this form."}
         </p>
-        <RecaptchaCheckbox
-          ref={recaptchaRef}
-          className="mt-3"
-          onTokenChange={(token) => {
-            setRecaptchaToken(token);
-            if (token) {
-              setSubmitErrors([]);
-            }
-          }}
-          onStatusChange={(status) => setCaptchaStatus(status)}
-        />
+        {recaptchaMode === "checkbox" ? (
+          <RecaptchaCheckbox
+            ref={recaptchaRef}
+            className="mt-3"
+            onTokenChange={(token) => {
+              setRecaptchaToken(token);
+              if (token) {
+                setSubmitErrors([]);
+              }
+            }}
+            onStatusChange={(status) => setCaptchaStatus(status)}
+          />
+        ) : (
+          <p className="mt-3 text-xs font-medium text-[var(--muted)]">
+            Google reCAPTCHA v3 is enabled for this environment. The check runs automatically on submit.
+          </p>
+        )}
       </div>
 
       {submitErrors.length > 0 ? (

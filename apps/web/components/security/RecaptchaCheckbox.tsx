@@ -3,8 +3,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   CaptchaErrorCode,
+  RecaptchaMode,
   RecaptchaWidgetStatus,
   getCaptchaErrorMessage,
+  getRecaptchaMode,
   getRecaptchaSiteKey,
   isRecaptchaSiteKeyConfigured,
   loadRecaptchaScript
@@ -39,8 +41,9 @@ export const RecaptchaCheckbox = forwardRef<RecaptchaCheckboxHandle, RecaptchaCh
     const onTokenChangeRef = useRef(onTokenChange);
     const onStatusChangeRef = useRef(onStatusChange);
     const siteKey = getRecaptchaSiteKey();
+    const mode: RecaptchaMode = getRecaptchaMode();
     const [status, setStatus] = useState<RecaptchaWidgetStatus>(() =>
-      isRecaptchaSiteKeyConfigured(siteKey)
+      isRecaptchaSiteKeyConfigured(siteKey) && mode === "checkbox"
         ? { state: "loading", message: "Loading security check..." }
         : {
             state: "error",
@@ -102,6 +105,11 @@ export const RecaptchaCheckbox = forwardRef<RecaptchaCheckboxHandle, RecaptchaCh
         return;
       }
 
+      if (mode !== "checkbox") {
+        publishStatus({ state: "ready", message: "" });
+        return;
+      }
+
       let cancelled = false;
 
       const handleWidgetError = (code: CaptchaErrorCode, message: string) => {
@@ -112,7 +120,7 @@ export const RecaptchaCheckbox = forwardRef<RecaptchaCheckboxHandle, RecaptchaCh
 
       publishStatus({ state: "loading", message: "Loading security check..." });
 
-      loadRecaptchaScript(siteKey)
+      loadRecaptchaScript(siteKey, "checkbox")
         .then(() => {
           if (cancelled || !widgetContainerRef.current || !window.grecaptcha?.render) {
             return;
@@ -158,7 +166,7 @@ export const RecaptchaCheckbox = forwardRef<RecaptchaCheckboxHandle, RecaptchaCh
       return () => {
         cancelled = true;
       };
-    }, [siteKey, size, theme]);
+    }, [mode, siteKey, size, theme]);
 
     const shouldShowStatus = status.state !== "ready" && status.message;
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  getRecaptchaMode,
   extractCaptchaErrorCode,
   getCaptchaErrorMessage,
   isRecaptchaSiteKeyConfigured
@@ -22,5 +23,13 @@ describe("reCAPTCHA web helpers", () => {
     expect(extractCaptchaErrorCode({ code: "captcha_invalid" })).toBe("captcha_invalid");
     expect(extractCaptchaErrorCode({ code: "unknown" })).toBeUndefined();
     expect(extractCaptchaErrorCode(null)).toBeUndefined();
+  });
+
+  test("W6.4 - defaults recaptcha mode to checkbox and supports v3 override", () => {
+    delete process.env.NEXT_PUBLIC_RECAPTCHA_MODE;
+    expect(getRecaptchaMode()).toBe("checkbox");
+
+    process.env.NEXT_PUBLIC_RECAPTCHA_MODE = "v3";
+    expect(getRecaptchaMode()).toBe("v3");
   });
 });
