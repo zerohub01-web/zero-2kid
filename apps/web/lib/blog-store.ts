@@ -180,10 +180,9 @@ function normalizeStoredPost(value: unknown): AdminBlogPost | null {
 }
 
 async function readStoredPosts(): Promise<AdminBlogPost[]> {
-  const fs = await import("node:fs/promises");
-  const filePath = await resolveStoragePath();
-
   try {
+    const fs = await import("node:fs/promises");
+    const filePath = await resolveStoragePath();
     const raw = await fs.readFile(filePath, "utf8");
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
