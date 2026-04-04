@@ -363,8 +363,11 @@ export function LeadCaptureWidget() {
         })
       });
 
-      const data = await res.json().catch(() => ({ success: true }));
-      const isSuccess = res.ok || data?.success === true || data?.fallback === true;
+      const data = await res.json().catch(() => ({
+        success: false,
+        error: "Unexpected response from lead service."
+      }));
+      const isSuccess = res.ok && data?.fallback !== true && data?.success !== false;
       setIsTyping(false);
 
       if (isSuccess) {

@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -189,7 +190,7 @@ export default function ContractDetailViewPage() {
             <MessageSquare size={14} /> Send WhatsApp Reminder
           </a>
 
-          <Link href={`/zero-control/contracts/${contract.id}`} className="px-4 py-2 rounded-lg border border-black/10 bg-white text-sm font-semibold">
+          <Link href={`/zero-control/contracts/${contract.id}` as Route} className="px-4 py-2 rounded-lg border border-black/10 bg-white text-sm font-semibold">
             Edit Contract
           </Link>
         </div>

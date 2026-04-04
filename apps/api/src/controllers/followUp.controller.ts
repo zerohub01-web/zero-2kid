@@ -3,7 +3,7 @@ import { FollowUpModel } from "../models/FollowUp.js";
 
 export async function getFollowUps(req: Request, res: Response) {
   const status = typeof req.query.status === "string" ? req.query.status : "";
-  const day = typeof req.query.day === "string" ? Number(req.query.day) : NaN;
+  const day = typeof req.query.day === "string" ? Number(req.query.day) : Number.NaN;
 
   const query: Record<string, unknown> = {};
   if (status && status !== "all") {
@@ -21,8 +21,8 @@ export async function getFollowUps(req: Request, res: Response) {
   }
 
   const rows = await FollowUpModel.find(query)
-    .populate("leadId", "bookingId name email phone service status")
-    .sort({ scheduledAt: -1 })
+    .populate("leadId", "bookingId name email phone service status createdAt followUpSentAt")
+    .sort({ scheduledAt: 1, createdAt: 1 })
     .limit(500);
 
   return res.json(
@@ -39,12 +39,15 @@ export async function getFollowUps(req: Request, res: Response) {
       lead:
         row.leadId && typeof row.leadId === "object"
           ? {
+              id: String((row.leadId as any)._id),
               bookingId: (row.leadId as any).bookingId,
               name: (row.leadId as any).name,
               email: (row.leadId as any).email,
               phone: (row.leadId as any).phone,
               service: (row.leadId as any).service,
-              status: (row.leadId as any).status
+              status: (row.leadId as any).status,
+              createdAt: (row.leadId as any).createdAt,
+              followUpSentAt: (row.leadId as any).followUpSentAt ?? null
             }
           : null
     }))

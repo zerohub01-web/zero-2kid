@@ -26,7 +26,7 @@ type BookingStatus = "new" | "contacted" | "converted";
 type LeadScore = "high" | "medium" | "low";
 type ChatStatus = "new" | "engaged" | "converted";
 type FollowUpStatus = "pending" | "sent" | "failed" | "cancelled";
-type CallStatus = "booked" | "completed" | "cancelled";
+type CallStatus = "booked" | "confirmed" | "completed" | "cancelled";
 
 interface BookingLead {
   _id: string;
@@ -114,9 +114,44 @@ const followUpStatusStyles: Record<FollowUpStatus, string> = {
 
 const callStatusStyles: Record<CallStatus, string> = {
   booked: "bg-sky-100 text-sky-800",
+  confirmed: "bg-emerald-100 text-emerald-700",
   completed: "bg-emerald-100 text-emerald-800",
   cancelled: "bg-slate-200 text-slate-700"
 };
+
+function getProposalUrl(lead: BookingLead): string {
+  if (!lead.proposalUrl) return "#";
+
+  const productionBase = (process.env.NEXT_PUBLIC_WEB_URL || "https://www.zeroops.in").replace(/\/$/, "");
+
+  if (lead.proposalUrl.startsWith("http") && !lead.proposalUrl.includes("localhost")) {
+    return lead.proposalUrl;
+  }
+
+  try {
+    const parsed = new URL(lead.proposalUrl);
+    if (parsed.hostname && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+      return lead.proposalUrl;
+    }
+
+    if (parsed.pathname.startsWith("/api/proposals/")) {
+      return `${productionBase}${parsed.pathname}`;
+    }
+  } catch {
+    if (lead.proposalUrl.startsWith("/api/proposals/")) {
+      return `${productionBase}${lead.proposalUrl}`;
+    }
+  }
+
+  return `${productionBase}/api/proposals/${lead._id}/pdf`;
+}
+
+function getCallStatusLabel(status: CallStatus) {
+  if (status === "booked") return "Confirm?";
+  if (status === "confirmed") return "Confirmed";
+  if (status === "completed") return "Done";
+  return "Cancelled";
+}
 
 export default function ZeroControlDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -543,7 +578,7 @@ export default function ZeroControlDashboard() {
                     <td className="py-4 pr-4 align-top text-xs">
                       {booking.proposalUrl ? (
                         <a
-                          href={booking.proposalUrl}
+                          href={getProposalUrl(booking)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-[var(--ink)] font-semibold underline"
@@ -820,7 +855,7 @@ export default function ZeroControlDashboard() {
             </p>
           </div>
           <div className="flex gap-2">
-            {(["all", "booked", "completed", "cancelled"] as const).map((status) => (
+            {(["all", "booked", "confirmed", "completed", "cancelled"] as const).map((status) => (
               <button
                 key={status}
                 onClick={() => setCallStatusFilter(status)}
@@ -872,7 +907,7 @@ export default function ZeroControlDashboard() {
                           callStatusStyles[call.status]
                         }`}
                       >
-                        {call.status}
+                        {getCallStatusLabel(call.status)}
                       </span>
                     </td>
                     <td className="py-3 pr-4 text-xs text-[var(--muted)]">
@@ -880,6 +915,13 @@ export default function ZeroControlDashboard() {
                     </td>
                     <td className="py-3 pr-4">
                       <div className="flex gap-2">
+                        <button
+                          onClick={() => updateCallStatus(call.id, "confirmed")}
+                          disabled={mutatingCallId === call.id || call.status === "confirmed"}
+                          className="px-3 py-1.5 rounded-md bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition disabled:opacity-60"
+                        >
+                          Confirm
+                        </button>
                         <button
                           onClick={() => updateCallStatus(call.id, "completed")}
                           disabled={mutatingCallId === call.id || call.status === "completed"}

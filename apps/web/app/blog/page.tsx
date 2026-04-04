@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { SiteFooter } from "../../components/SiteFooter";
 import { SiteHeader } from "../../components/SiteHeader";
@@ -68,7 +68,7 @@ export default async function BlogIndexPage() {
                     </span>
                   ))}
                 </div>
-                <Link href={`/blog/${post.slug}`} className="mt-5 inline-flex text-sm font-semibold underline">
+                <Link href={`/blog/${post.slug}` as Route} className="mt-5 inline-flex text-sm font-semibold underline">
                   Read article
                 </Link>
               </article>

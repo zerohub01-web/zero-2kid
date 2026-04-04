@@ -2,6 +2,7 @@ import mongoose, { Schema, type HydratedDocument } from "mongoose";
 
 export type InvoiceStatus = "DRAFT" | "SENT" | "VIEWED" | "SIGNED" | "PAID" | "OVERDUE" | "CANCELLED";
 export type ContractStatus = "DRAFT" | "SENT" | "VIEWED" | "SIGNED" | "COMPLETED" | "CANCELLED";
+export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface InvoiceItem {
   description: string;
@@ -108,6 +109,30 @@ export interface AdminSettings {
 }
 
 export type AdminSettingsDocument = HydratedDocument<AdminSettings>;
+
+export interface Review {
+  clientId?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+  publishedAt?: Date;
+  status: ReviewStatus;
+  clientName: string;
+  clientEmail: string;
+  clientBusiness?: string;
+  serviceUsed?: string;
+  rating: number;
+  reviewText: string;
+  testimonial: string;
+  approved: boolean;
+  approvedBy?: string;
+  rejectedBy?: string;
+  rejectReason?: string;
+  source: string;
+  featured: boolean;
+  displayOrder: number;
+}
+
+export type ReviewDocument = HydratedDocument<Review>;
 
 const invoiceItemSchema = new Schema<InvoiceItem>(
   {
@@ -240,6 +265,38 @@ const adminSettingsSchema = new Schema<AdminSettings>(
   { timestamps: true }
 );
 
+const reviewSchema = new Schema<Review>(
+  {
+    clientId: { type: Schema.Types.ObjectId, ref: "Customer", required: false, index: true },
+    publishedAt: { type: Date, default: null },
+    status: {
+      type: String,
+      enum: ["PENDING", "APPROVED", "REJECTED"],
+      default: "PENDING",
+      index: true
+    },
+
+    clientName: { type: String, required: true, trim: true },
+    clientEmail: { type: String, required: true, trim: true, lowercase: true, index: true },
+    clientBusiness: { type: String, trim: true, default: "" },
+    serviceUsed: { type: String, trim: true, default: "" },
+
+    rating: { type: Number, required: true, min: 1, max: 5 },
+    reviewText: { type: String, required: true, trim: true, maxlength: 500 },
+    testimonial: { type: String, required: true, trim: true, maxlength: 500 },
+    approved: { type: Boolean, default: false, index: true },
+
+    approvedBy: { type: String, trim: true, default: "" },
+    rejectedBy: { type: String, trim: true, default: "" },
+    rejectReason: { type: String, trim: true, default: "" },
+
+    source: { type: String, trim: true, default: "portal" },
+    featured: { type: Boolean, default: false, index: true },
+    displayOrder: { type: Number, default: 0 }
+  },
+  { timestamps: true }
+);
+
 invoiceSchema.index({ createdAt: -1 });
 invoiceSchema.index({ status: 1, dueDate: 1 });
 invoiceSchema.index({ clientEmail: 1 });
@@ -247,6 +304,10 @@ invoiceSchema.index({ clientEmail: 1 });
 contractSchema.index({ createdAt: -1 });
 contractSchema.index({ status: 1, effectiveDate: 1 });
 contractSchema.index({ clientEmail: 1 });
+
+reviewSchema.index({ status: 1, publishedAt: -1, createdAt: -1 });
+reviewSchema.index({ clientEmail: 1, createdAt: -1 });
+reviewSchema.index({ featured: 1, displayOrder: 1, publishedAt: -1 });
 
 export const InvoiceModel =
   (mongoose.models.Invoice as mongoose.Model<Invoice>) || mongoose.model<Invoice>("Invoice", invoiceSchema);
@@ -257,3 +318,6 @@ export const ContractModel =
 export const AdminSettingsModel =
   (mongoose.models.AdminSettings as mongoose.Model<AdminSettings>) ||
   mongoose.model<AdminSettings>("AdminSettings", adminSettingsSchema);
+
+export const ReviewModel =
+  (mongoose.models.Review as mongoose.Model<Review>) || mongoose.model<Review>("Review", reviewSchema);

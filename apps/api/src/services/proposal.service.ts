@@ -89,6 +89,52 @@ export function getProposalsDirectoryPath() {
   return PROPOSALS_DIR;
 }
 
+function extractProposalFileName(storedUrl?: string) {
+  const raw = String(storedUrl ?? "").trim();
+  if (!raw) return "";
+
+  const candidate = raw.split("?")[0]?.split("/").pop() ?? "";
+  if (!candidate.toLowerCase().endsWith(".pdf")) {
+    return "";
+  }
+
+  return decodeURIComponent(candidate);
+}
+
+export async function resolveProposalPdfForBooking(publicBookingId: string, storedUrl?: string) {
+  await fs.mkdir(PROPOSALS_DIR, { recursive: true });
+
+  const storedFileName = extractProposalFileName(storedUrl);
+  if (storedFileName) {
+    const directPath = path.join(PROPOSALS_DIR, storedFileName);
+    try {
+      await fs.access(directPath);
+      return {
+        fileName: storedFileName,
+        filePath: directPath
+      };
+    } catch {
+      // Fall through to prefix search.
+    }
+  }
+
+  const files = await fs.readdir(PROPOSALS_DIR);
+  const prefix = `${publicBookingId}-`;
+  const match = files
+    .filter((file) => file.startsWith(prefix) && file.toLowerCase().endsWith(".pdf"))
+    .sort()
+    .at(-1);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    fileName: match,
+    filePath: path.join(PROPOSALS_DIR, match)
+  };
+}
+
 export async function generateProposalForLead(
   lead: BookingDocument,
   proposalBaseUrl: string

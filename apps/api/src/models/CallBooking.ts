@@ -1,6 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 
-export type CallStatus = "booked" | "completed" | "cancelled";
+export type CallStatus = "booked" | "confirmed" | "completed" | "cancelled";
 
 export interface CallBookingDocument extends mongoose.Document {
   name: string;
@@ -19,7 +19,7 @@ const callBookingSchema = new Schema<CallBookingDocument>(
     timeSlot: { type: Date, required: true },
     status: {
       type: String,
-      enum: ["booked", "completed", "cancelled"],
+      enum: ["booked", "confirmed", "completed", "cancelled"],
       default: "booked"
     },
     reminderSentAt: { type: Date, default: null }

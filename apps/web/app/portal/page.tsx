@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import { toast } from "react-hot-toast";
-import { FolderKanban, FolderOpen, LogOut, Mail, MessageSquare, RefreshCw, ShieldCheck, Star, UserRound } from "lucide-react";
+import { FolderKanban, FolderOpen, LogOut, Mail, MessageSquare, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import { SiteHeader } from "../../components/SiteHeader";
 import type { CustomerProfile, CustomerProject } from "../../types/customer";
 
@@ -32,6 +32,13 @@ type PortalProject = CustomerProject & {
   invoice?: PortalInvoice | null;
 };
 
+interface PortalReviewRecord {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  rating: number;
+  reviewText: string;
+}
+
 function statusTone(status: CustomerProject["status"]) {
   if (status === "COMPLETED" || status === "completed" || status === "closed" || status === "converted") return "text-emerald-700";
   if (status === "CONFIRMED" || status === "contacted") return "text-sky-700";
@@ -58,6 +65,24 @@ function getInvoiceStatusLabel(status: PortalInvoice["status"]): string {
   return status;
 }
 
+function isReviewEligibleProject(project: PortalProject) {
+  const normalizedStatus = String(project.status ?? "").toLowerCase();
+  const contractStatus = String(project.contract?.status ?? "").toUpperCase();
+
+  return (
+    normalizedStatus === "completed" ||
+    normalizedStatus === "closed" ||
+    normalizedStatus === "converted" ||
+    contractStatus === "SIGNED" ||
+    contractStatus === "COMPLETED"
+  );
+}
+
+function getReviewServiceLabel(project: PortalProject | null) {
+  if (!project) return "";
+  return project.type || project.businessType || project.title || "";
+}
+
 export default function PortalPage() {
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [projects, setProjects] = useState<PortalProject[]>([]);
@@ -67,7 +92,8 @@ export default function PortalPage() {
   const [posting, setPosting] = useState<string | null>(null);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
-  const [hasExistingReview, setHasExistingReview] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [existingReview, setExistingReview] = useState<PortalReviewRecord | null>(null);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [unseenDocs, setUnseenDocs] = useState(0);
   const [unseenByProject, setUnseenByProject] = useState<Record<string, number>>({});
@@ -120,9 +146,19 @@ export default function PortalPage() {
         recalculateUnseenDocs(projectItems);
 
         if (reviewRes.data.review) {
-          setReviewRating(reviewRes.data.review.rating);
-          setReviewText(reviewRes.data.review.testimonial);
-          setHasExistingReview(true);
+          const review = reviewRes.data.review as PortalReviewRecord & { testimonial?: string };
+          setReviewRating(Number(review.rating || 0));
+          setReviewText(String(review.reviewText || review.testimonial || ""));
+          setExistingReview({
+            id: review.id,
+            status: review.status,
+            rating: Number(review.rating || 0),
+            reviewText: String(review.reviewText || review.testimonial || "")
+          });
+        } else {
+          setExistingReview(null);
+          setReviewRating(0);
+          setReviewText("");
         }
       } catch (err: unknown) {
         const code = (err as { response?: { status?: number } })?.response?.status;
@@ -147,6 +183,30 @@ export default function PortalPage() {
   useEffect(() => {
     recalculateUnseenDocs(projects);
   }, [projects, recalculateUnseenDocs]);
+
+  const eligibleReviewProject = useMemo(() => {
+    return [...projects]
+      .sort((left, right) => {
+        const leftTime = new Date(left.createdAt ?? left.date ?? 0).getTime();
+        const rightTime = new Date(right.createdAt ?? right.date ?? 0).getTime();
+        return rightTime - leftTime;
+      })
+      .find((project) => isReviewEligibleProject(project)) ?? null;
+  }, [projects]);
+
+  useEffect(() => {
+    if (!eligibleReviewProject) {
+      setReviewSubmitted(Boolean(existingReview));
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(`review_submitted_${eligibleReviewProject.id}`) === "true";
+      setReviewSubmitted(Boolean(existingReview) || stored);
+    } catch {
+      setReviewSubmitted(Boolean(existingReview));
+    }
+  }, [eligibleReviewProject, existingReview]);
 
   function markDocSeen(type: "contract" | "invoice", id: string) {
     try {
@@ -186,15 +246,44 @@ export default function PortalPage() {
   }
 
   async function handleReviewSubmit() {
-    if (reviewRating === 0 || !reviewText.trim()) {
-      toast.error("Please provide both a rating and a testimonial.");
+    if (!eligibleReviewProject) {
+      toast.error("Reviews open once your project is completed or signed.");
       return;
     }
+
+    if (reviewRating === 0 || reviewText.trim().length < 20) {
+      toast.error("Please provide a rating and at least 20 characters of feedback.");
+      return;
+    }
+
     setSubmittingReview(true);
     try {
-      await api.post("/api/reviews", { rating: reviewRating, testimonial: reviewText });
-      toast.success("Review submitted! It will appear publicly once approved.");
-      setHasExistingReview(true);
+      const { data } = await api.post("/api/reviews", {
+        rating: reviewRating,
+        reviewText: reviewText.trim(),
+        clientName: customer?.name ?? "Client",
+        clientEmail: customer?.email ?? "",
+        clientBusiness: eligibleReviewProject.businessType || "",
+        serviceUsed: getReviewServiceLabel(eligibleReviewProject),
+        source: "portal"
+      });
+
+      const review = data?.review as PortalReviewRecord | undefined;
+      setExistingReview(
+        review ?? {
+          id: "pending",
+          status: "PENDING",
+          rating: reviewRating,
+          reviewText: reviewText.trim()
+        }
+      );
+      setReviewSubmitted(true);
+      try {
+        window.localStorage.setItem(`review_submitted_${eligibleReviewProject.id}`, "true");
+      } catch {
+        // no-op
+      }
+      toast.success("Thank you! Your review was submitted for approval.");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to submit review.";
       toast.error(msg);
@@ -477,35 +566,58 @@ export default function PortalPage() {
           </section>
         </div>
 
-        <section className="soft-card p-6 mt-8">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl font-display text-[var(--ink)]">{hasExistingReview ? "Edit your review" : "Leave a Review"}</h2>
-            <p className="text-[var(--muted)] mt-2">How was your experience with ZeroOps? Your feedback helps us grow.</p>
+        {eligibleReviewProject ? (
+          <section className="review-section">
+            <h3 className="review-section-title">{"\u2B50"} Leave a Review</h3>
+            <p className="review-section-subtitle">
+              Share your experience with ZERO OPS for {getReviewServiceLabel(eligibleReviewProject) || eligibleReviewProject.title}.
+            </p>
 
-            <div className="mt-8 flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} onClick={() => setReviewRating(star)} className="transition transform hover:scale-110 active:scale-95">
-                  <Star size={32} className={star <= reviewRating ? "fill-amber-400 text-amber-400" : "text-gray-300"} />
+            {reviewSubmitted ? (
+              <div className="review-thanks">
+                <p>
+                  {existingReview?.status === "APPROVED"
+                    ? "\u2705 Thank you! Your review has been published on the website."
+                    : "\u2705 Thank you! Your review has been submitted and is awaiting approval."}
+                </p>
+              </div>
+            ) : (
+              <div className="review-form">
+                <div className="star-row">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      className={`star-btn ${reviewRating >= star ? "active" : ""}`}
+                      onClick={() => setReviewRating(star)}
+                    >
+                      {"\u2605"}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  placeholder="Tell us about your experience with ZERO OPS..."
+                  value={reviewText}
+                  onChange={(event) => setReviewText(event.target.value.slice(0, 500))}
+                  rows={4}
+                  className="review-textarea"
+                  maxLength={500}
+                />
+                <div className="review-char-count">{reviewText.length}/500</div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleReviewSubmit()}
+                  disabled={reviewRating === 0 || reviewText.trim().length < 20 || submittingReview}
+                  className="review-submit-btn"
+                >
+                  {submittingReview ? "Submitting..." : "Submit Review"}
                 </button>
-              ))}
-            </div>
-
-            <div className="mt-6 relative">
-              <textarea
-                value={reviewText}
-                onChange={(event) => setReviewText(event.target.value.slice(0, 500))}
-                placeholder="Share your experience (max 500 characters)..."
-                className="w-full h-32 p-4 rounded-xl border border-black/10 bg-white/65 focus:outline-none focus:ring-2 focus:ring-[var(--ink)] transition text-sm resize-none"
-              />
-              <span className="absolute bottom-3 right-3 text-[10px] text-[var(--muted)] font-mono">{reviewText.length}/500</span>
-            </div>
-
-            <button onClick={() => void handleReviewSubmit()} disabled={submittingReview} className="mt-6 btn-primary w-full py-3 rounded-xl disabled:opacity-50">
-              {submittingReview ? <RefreshCw size={18} className="animate-spin mx-auto" /> : hasExistingReview ? "Update Review" : "Submit Review"}
-            </button>
-            <p className="text-[10px] text-[var(--muted)] mt-4 italic">* Approved reviews appear publicly on our homepage.</p>
-          </div>
-        </section>
+              </div>
+            )}
+          </section>
+        ) : null}
       </div>
 
       <style jsx>{`
@@ -636,6 +748,108 @@ export default function PortalPage() {
           50% {
             opacity: 0.6;
           }
+        }
+
+        .review-section {
+          margin-top: 28px;
+          padding: 24px;
+          background: #fffdf5;
+          border: 1px solid #f0e68c;
+          border-radius: 12px;
+        }
+
+        .review-section-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #111;
+          margin-bottom: 8px;
+        }
+
+        .review-section-subtitle {
+          font-size: 13px;
+          color: #666;
+          margin-bottom: 16px;
+        }
+
+        .star-row {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+
+        .star-btn {
+          font-size: 28px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #ddd;
+          transition: color 0.15s, transform 0.15s;
+          padding: 0;
+          line-height: 1;
+        }
+
+        .star-btn.active {
+          color: #f59e0b;
+        }
+
+        .star-btn:hover {
+          color: #f59e0b;
+          transform: scale(1.15);
+        }
+
+        .review-textarea {
+          width: 100%;
+          padding: 12px 16px;
+          border: 1px solid #e5e5e5;
+          border-radius: 8px;
+          font-size: 14px;
+          font-family: inherit;
+          resize: vertical;
+          outline: none;
+          transition: border-color 0.2s;
+          color: #333;
+          background: #fff;
+        }
+
+        .review-textarea:focus {
+          border-color: #0a0a0f;
+        }
+
+        .review-char-count {
+          font-size: 11px;
+          color: #aaa;
+          text-align: right;
+          margin: 4px 0 12px;
+        }
+
+        .review-submit-btn {
+          background: #0a0a0f;
+          color: #fff;
+          border: none;
+          padding: 12px 28px;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .review-submit-btn:hover:not(:disabled) {
+          background: #333;
+        }
+
+        .review-submit-btn:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+        }
+
+        .review-thanks {
+          padding: 16px;
+          background: #e8f5e9;
+          border-radius: 8px;
+          color: #2e7d32;
+          font-size: 14px;
+          font-weight: 500;
         }
 
         @media (max-width: 640px) {

@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -138,7 +139,7 @@ export default function ZeroControlInvoicesPage() {
               <RefreshCcw size={14} /> Refresh
             </button>
             <Link
-              href="/zero-control/invoices/new"
+              href={"/zero-control/invoices/new" as Route}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--ink)] text-white text-sm font-semibold"
             >
               <Plus size={14} /> New Invoice
@@ -236,10 +237,10 @@ export default function ZeroControlInvoicesPage() {
                     <td className="py-3">{new Date(row.dueDate).toLocaleDateString("en-IN")}</td>
                     <td className="py-3">
                       <div className="flex flex-wrap gap-2">
-                        <Link href={`/zero-control/invoices/${row.id}`} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
+                        <Link href={`/zero-control/invoices/${row.id}` as Route} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
                           Edit
                         </Link>
-                        <Link href={`/zero-control/invoices/${row.id}/view`} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
+                        <Link href={`/zero-control/invoices/${row.id}/view` as Route} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
                           View
                         </Link>
                         <button

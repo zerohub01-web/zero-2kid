@@ -1,12 +1,38 @@
 "use client";
 
+import type { Route } from "next";
+import { ReactNode, useEffect, useState } from "react";
+import Link from "next/link";
+import { toast } from "react-hot-toast";
+import {
+  BarChart3,
+  FileSignature,
+  FileText,
+  Home,
+  LogOut,
+  MessageCircle,
+  MessageSquareMore,
+  PhoneCall,
+  ReceiptText,
+  Settings,
+  Star,
+  Users
+} from "lucide-react";
 import { ZeroLogo } from "../../components/brand/ZeroLogo";
 import { api } from "../../lib/api";
-import { toast } from "react-hot-toast";
-import { LogOut, Home, Users, BarChart, Briefcase, FileText, ReceiptText, FileSignature, Settings } from "lucide-react";
-import Link from "next/link";
-import { ReactNode, useEffect, useState } from "react";
 import { useAuthStore } from "../../store/auth";
+
+type NavItem = {
+  label: string;
+  href: string;
+  icon: ReactNode;
+  badge?: number;
+};
+
+type NavSection = {
+  heading: string;
+  items: NavItem[];
+};
 
 export default function ZeroControlAdminLayout({ children }: { children: ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -25,15 +51,7 @@ export default function ZeroControlAdminLayout({ children }: { children: ReactNo
   };
 
   const isAcceptableStatus = (status: number) =>
-    status === 0 ||
-    status === 200 ||
-    status === 204 ||
-    status === 401 ||
-    status === 403 ||
-    status === 404 ||
-    status === 500 ||
-    status === 502 ||
-    status === 503;
+    status === 0 || status === 200 || status === 204 || status === 401 || status === 403 || status === 404 || status === 500;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -100,59 +118,86 @@ export default function ZeroControlAdminLayout({ children }: { children: ReactNo
     };
   }, []);
 
+  const sections: NavSection[] = [
+    {
+      heading: "MAIN",
+      items: [
+        { label: "Dashboard", href: "/zero-control", icon: <Home size={18} /> },
+        { label: "Lead Inbox", href: "/zero-control/clients", icon: <Users size={18} /> },
+        { label: "Bookings", href: "/zero-control/clients", icon: <Users size={18} /> }
+      ]
+    },
+    {
+      heading: "COMMUNICATION",
+      items: [
+        { label: "WhatsApp Conversations", href: "/zero-control/whatsapp", icon: <MessageCircle size={18} /> },
+        { label: "Smart Follow-ups", href: "/zero-control/followups", icon: <MessageSquareMore size={18} /> },
+        { label: "Call Bookings", href: "/zero-control/calls", icon: <PhoneCall size={18} /> }
+      ]
+    },
+    {
+      heading: "DOCUMENTS",
+      items: [
+        {
+          label: "Contracts",
+          href: "/zero-control/contracts",
+          icon: <FileSignature size={18} />,
+          badge: pendingContracts
+        },
+        {
+          label: "Invoices",
+          href: "/zero-control/invoices",
+          icon: <ReceiptText size={18} />,
+          badge: pendingInvoices
+        },
+        { label: "Proposals", href: "/zero-control/proposals", icon: <FileText size={18} /> }
+      ]
+    },
+    {
+      heading: "SETTINGS",
+      items: [
+        { label: "Analytics", href: "/zero-control/analytics", icon: <BarChart3 size={18} /> },
+        { label: "Reviews", href: "/zero-control/reviews", icon: <Star size={18} /> },
+        { label: "Settings", href: "/zero-control/settings", icon: <Settings size={18} /> }
+      ]
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-[var(--bg-a)] flex">
-      <aside className="w-64 border-r border-black/10 bg-white/50 backdrop-blur-md flex flex-col">
+      <aside className="w-72 border-r border-black/10 bg-white/50 backdrop-blur-md flex flex-col">
         <div className="p-6 border-b border-black/10">
           <ZeroLogo variant="inverted" />
           <p className="text-xs uppercase tracking-[0.15em] text-[var(--muted)] font-semibold mt-6">Admin Control</p>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <Link href="/zero-control" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]">
-            <Home size={18} /> Dashboard
-          </Link>
 
-          <Link href="/zero-control/clients" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]">
-            <Users size={18} /> Bookings
-          </Link>
-
-          <Link href="/zero-control/contracts" className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]">
-            <span className="inline-flex items-center gap-3">
-              <FileSignature size={18} /> Contracts
-            </span>
-            {pendingContracts > 0 ? (
-              <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                {pendingContracts}
-              </span>
-            ) : null}
-          </Link>
-
-          <Link href="/zero-control/invoices" className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]">
-            <span className="inline-flex items-center gap-3">
-              <ReceiptText size={18} /> Invoices
-            </span>
-            {pendingInvoices > 0 ? (
-              <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                {pendingInvoices}
-              </span>
-            ) : null}
-          </Link>
-
-          <Link href="/zero-control/settings" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]">
-            <Settings size={18} /> Settings
-          </Link>
-
-          <Link href="/zero-control/works" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]">
-            <Briefcase size={18} /> Previous Works
-          </Link>
-
-          <Link href="/zero-control/blog" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]">
-            <FileText size={18} /> Blog Manager
-          </Link>
-
-          <Link href="/zero-control/analytics" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]">
-            <BarChart size={18} /> Analytics
-          </Link>
+        <nav className="flex-1 p-4 overflow-y-auto">
+          {sections.map((section) => (
+            <div key={section.heading} className="mb-6 last:mb-0">
+              <p className="px-4 pb-2 text-[11px] uppercase tracking-[0.18em] text-[var(--muted)] font-bold">
+                {section.heading}
+              </p>
+              <div className="space-y-1">
+                {section.items.map((item) => (
+                  <Link
+                    key={`${section.heading}-${item.href}`}
+                    href={item.href as Route}
+                    className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg hover:bg-black/5 text-sm font-medium transition text-[var(--ink)]"
+                  >
+                    <span className="inline-flex items-center gap-3">
+                      {item.icon}
+                      {item.label}
+                    </span>
+                    {typeof item.badge === "number" && item.badge > 0 ? (
+                      <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="p-4 border-t border-black/10">

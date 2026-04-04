@@ -13,6 +13,7 @@ import { getProposalsDirectoryPath } from "./services/proposal.service.js";
 import { whatsappRouter } from "./routes/whatsapp.routes.js";
 import { invoiceRouter } from "./routes/invoice.routes.js";
 import { contractRouter } from "./routes/contract.routes.js";
+import { proposalRouter } from "./routes/proposal.routes.js";
 
 type RequestWithRawBody = express.Request & { rawBody?: string };
 
@@ -70,6 +71,7 @@ app.get("/", (_req, res) =>
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+app.use("/api/proposals", proposalRouter);
 app.use("/api/proposals", express.static(getProposalsDirectoryPath()));
 app.use("/api/invoices/storage", express.static("storage/invoices"));
 app.use("/api/contracts/storage", express.static("storage/contracts"));

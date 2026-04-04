@@ -1,7 +1,8 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import type { Route } from "next";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import SignaturePad from "signature_pad";
 import toast from "react-hot-toast";
 import { Loader2, Plus, Save, Send, Trash2, FileText, RefreshCcw } from "lucide-react";
@@ -92,6 +93,29 @@ interface SentModalState {
   portalLink: string;
 }
 
+interface BookingPrefillRecord {
+  bookingId?: string;
+  name?: string;
+  fullName?: string;
+  email?: string;
+  emailAddress?: string;
+  phone?: string;
+  phoneNumber?: string;
+  business?: string;
+  businessType?: string;
+  company?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  service?: string;
+  serviceType?: string;
+  quotedFee?: number;
+  amount?: number;
+  totalAmount?: number;
+  servicePriceSnapshot?: number;
+  budget?: number;
+}
+
 const ITEM_CATEGORIES = [
   "Website Dev",
   "SEO",
@@ -134,10 +158,26 @@ function formatMoney(symbol: string, amount: number): string {
   return `${symbol}${Number(amount || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
+function inferItemCategory(serviceLabel: string) {
+  const value = serviceLabel.toLowerCase();
+  if (value.includes("seo")) return "SEO";
+  if (value.includes("ad")) return "Ads Management";
+  if (value.includes("automation")) return "Automation";
+  if (value.includes("maintenance")) return "Maintenance";
+  if (value.includes("chatbot")) return "AI Chatbot";
+  if (value.includes("social")) return "Social Media";
+  if (value.includes("website")) return "Website Dev";
+  return "Other";
+}
+
 export default function InvoiceEditorPage() {
   const params = useParams<{ id: string }>();
+  const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const initialId = params?.id ?? "new";
+  const isProposalMode = pathname.includes("/zero-control/proposals/");
+  const editorBasePath = isProposalMode ? "/zero-control/proposals" : "/zero-control/invoices";
 
   const [invoiceId, setInvoiceId] = useState(initialId);
   const [loading, setLoading] = useState(true);
@@ -151,6 +191,10 @@ export default function InvoiceEditorPage() {
     portalLink: ""
   });
   const [saveDefaults, setSaveDefaults] = useState(false);
+  const [bookingIdInput, setBookingIdInput] = useState("");
+  const [prefilling, setPrefilling] = useState(false);
+  const [prefillError, setPrefillError] = useState("");
+  const [prefillSuccess, setPrefillSuccess] = useState(false);
 
   const [form, setForm] = useState<InvoiceFormState>({
     invoiceNumber: "",
@@ -182,6 +226,7 @@ export default function InvoiceEditorPage() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const signaturePadRef = useRef<SignaturePad | null>(null);
+  const queryPrefillAppliedRef = useRef(false);
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
@@ -231,6 +276,7 @@ export default function InvoiceEditorPage() {
         bookingId: data.bookingId || "",
         adminSignature: data.adminSignature || ""
       }));
+      setBookingIdInput(data.bookingId || "");
 
       const mappedItems = Array.isArray(data.items)
         ? data.items.map((item) =>
@@ -275,6 +321,48 @@ export default function InvoiceEditorPage() {
   }, [initialId]);
 
   useEffect(() => {
+    if (initialId !== "new" || queryPrefillAppliedRef.current) return;
+
+    const client = searchParams.get("client")?.trim() ?? "";
+    const email = searchParams.get("email")?.trim() ?? "";
+    const phone = searchParams.get("phone")?.trim() ?? "";
+    const service = searchParams.get("service")?.trim() ?? "";
+    const bookingId = searchParams.get("bookingId")?.trim() ?? "";
+
+    if (client || email || phone || service || bookingId) {
+      setForm((prev) => ({
+        ...prev,
+        clientName: client || prev.clientName,
+        clientEmail: email || prev.clientEmail,
+        clientPhone: phone || prev.clientPhone,
+        bookingId: bookingId || prev.bookingId,
+        proposalNote: !prev.proposalNote && service ? `Proposal prepared for ${service}.` : prev.proposalNote
+      }));
+
+      if (service) {
+        setItems((prev) => {
+          const first = prev[0] ?? makeItem();
+          return [
+            {
+              ...first,
+              category: inferItemCategory(service),
+              description: service
+            },
+            ...prev.slice(1)
+          ];
+        });
+      }
+
+      if (bookingId) {
+        setBookingIdInput(bookingId);
+        void prefillFromBookingId(bookingId);
+      }
+    }
+
+    queryPrefillAppliedRef.current = true;
+  }, [initialId, searchParams]);
+
+  useEffect(() => {
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
@@ -303,6 +391,74 @@ export default function InvoiceEditorPage() {
 
   const setField = <K extends keyof InvoiceFormState>(key: K, value: InvoiceFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const prefillFromBookingId = async (rawBookingId: string) => {
+    const nextBookingId = rawBookingId.trim();
+    if (!nextBookingId) return;
+
+    setPrefilling(true);
+    setPrefillError("");
+    setPrefillSuccess(false);
+
+    try {
+      const { data } = await api.get<BookingPrefillRecord | { booking?: BookingPrefillRecord }>(
+        `/api/admin/bookings/${encodeURIComponent(nextBookingId)}`
+      );
+      const booking =
+        data && typeof data === "object" && "booking" in data && data.booking
+          ? data.booking
+          : (data as BookingPrefillRecord);
+      if (!booking) {
+        setPrefillError("Booking not found. Check the ID and try again.");
+        return;
+      }
+
+      const serviceLabel = booking.service || booking.serviceType || "";
+      const amount = Number(
+        booking.quotedFee ?? booking.amount ?? booking.totalAmount ?? booking.servicePriceSnapshot ?? booking.budget ?? 0
+      );
+
+      setBookingIdInput(nextBookingId);
+      setForm((prev) => ({
+        ...prev,
+        clientName: booking.name || booking.fullName || prev.clientName,
+        clientEmail: booking.email || booking.emailAddress || prev.clientEmail,
+        clientPhone: booking.phone || booking.phoneNumber || prev.clientPhone,
+        clientBusiness: booking.business || booking.businessType || booking.company || prev.clientBusiness,
+        clientAddress: booking.address || prev.clientAddress,
+        clientLocation: booking.country || booking.city || prev.clientLocation || "IN",
+        bookingId: nextBookingId,
+        proposalNote: !prev.proposalNote && serviceLabel ? `Proposal prepared for ${serviceLabel}.` : prev.proposalNote
+      }));
+
+      if (serviceLabel || amount) {
+        setItems((prev) => {
+          const first = prev[0] ?? makeItem();
+          return [
+            {
+              ...first,
+              category: serviceLabel ? inferItemCategory(serviceLabel) : first.category,
+              description: serviceLabel || first.description,
+              quantity: Math.max(1, first.quantity || 1),
+              unitPrice: amount > 0 ? amount : first.unitPrice
+            },
+            ...prev.slice(1)
+          ];
+        });
+      }
+
+      setPrefillSuccess(true);
+    } catch (error) {
+      console.error(error);
+      setPrefillError("Failed to fetch booking. Try again.");
+    } finally {
+      setPrefilling(false);
+    }
+  };
+
+  const handlePrefillFromBooking = async () => {
+    await prefillFromBookingId(bookingIdInput);
   };
 
   const setItem = (id: string, patch: Partial<InvoiceItemForm>) => {
@@ -408,7 +564,7 @@ export default function InvoiceEditorPage() {
       const nextId = response.data?.id || invoiceId;
       if (isNew && nextId && nextId !== "new") {
         setInvoiceId(nextId);
-        router.replace(`/zero-control/invoices/${nextId}`);
+        router.replace(`${editorBasePath}/${nextId}` as Route);
       }
 
       setForm((prev) => ({
@@ -481,7 +637,7 @@ export default function InvoiceEditorPage() {
     try {
       await api.delete(`/api/invoices/${invoiceId}`);
       toast.success("Invoice deleted.");
-      router.push("/zero-control/invoices");
+      router.push(editorBasePath as Route);
     } catch (error) {
       console.error(error);
       toast.error("Failed to delete invoice.");
@@ -500,8 +656,12 @@ export default function InvoiceEditorPage() {
       clientBusiness: "",
       clientAddress: "",
       clientGST: "",
-      proposalNote: ""
+      proposalNote: "",
+      bookingId: ""
     }));
+    setBookingIdInput("");
+    setPrefillError("");
+    setPrefillSuccess(false);
     setItems([makeItem({ description: "Custom service item" })]);
     signaturePadRef.current?.clear();
   };
@@ -519,8 +679,14 @@ export default function InvoiceEditorPage() {
       <header className="soft-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-display text-[var(--ink)]">Invoice Editor</h1>
-            <p className="text-sm text-[var(--muted)] mt-1">Create proposals, set totals, generate PDF, and send via email.</p>
+            <h1 className="text-3xl font-display text-[var(--ink)]">
+              {isProposalMode ? "Proposal Editor" : "Invoice Editor"}
+            </h1>
+            <p className="text-sm text-[var(--muted)] mt-1">
+              {isProposalMode
+                ? "Build a client-ready proposal, prefill from booking data, and send it with a polished PDF."
+                : "Create proposals, set totals, generate PDF, and send via email."}
+            </p>
           </div>
           <div className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full border border-black/10 bg-white/70">
             Status: {form.status}
@@ -540,6 +706,37 @@ export default function InvoiceEditorPage() {
             <div className="grid grid-cols-2 gap-3">
               <input className="field py-2.5" placeholder="GST Number" value={form.clientGST} onChange={(e) => setField("clientGST", e.target.value)} />
               <input className="field py-2.5" placeholder="Location (IN / US...)" value={form.clientLocation} onChange={(e) => setField("clientLocation", e.target.value)} />
+            </div>
+            <div className="form-section">
+              <div className="section-label">LINKED BOOKING</div>
+              <div className="prefill-row">
+                <input
+                  type="text"
+                  placeholder="Enter booking ID to prefill"
+                  value={bookingIdInput}
+                  onChange={(event) => setBookingIdInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      void handlePrefillFromBooking();
+                    }
+                  }}
+                  className="prefill-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handlePrefillFromBooking()}
+                  disabled={prefilling || !bookingIdInput.trim()}
+                  className="prefill-btn"
+                >
+                  {prefilling ? "Loading..." : "Prefill from Booking"}
+                </button>
+              </div>
+              {prefillError ? <p className="prefill-error">{prefillError}</p> : null}
+              {prefillSuccess ? (
+                <p className="prefill-success">
+                  {"\u2713"} Client details filled from booking {bookingIdInput}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -572,7 +769,19 @@ export default function InvoiceEditorPage() {
                 ))}
               </select>
             </label>
-            <input className="field py-2.5" placeholder="Linked Booking ID (optional)" value={form.bookingId} onChange={(e) => setField("bookingId", e.target.value)} />
+            <input
+              className="field py-2.5"
+              placeholder="Linked Booking ID (optional)"
+              value={form.bookingId}
+              onChange={(e) => setField("bookingId", e.target.value)}
+              onBlur={() => {
+                const nextBookingId = form.bookingId.trim();
+                if (nextBookingId && nextBookingId !== bookingIdInput.trim()) {
+                  setBookingIdInput(nextBookingId);
+                  void prefillFromBookingId(nextBookingId);
+                }
+              }}
+            />
           </div>
         </div>
       </section>
@@ -826,6 +1035,80 @@ export default function InvoiceEditorPage() {
       ) : null}
 
       <style jsx>{`
+        .form-section {
+          margin-top: 8px;
+          padding: 16px;
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.75);
+        }
+
+        .section-label {
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--muted);
+          font-weight: 700;
+          margin-bottom: 10px;
+        }
+
+        .prefill-row {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .prefill-input {
+          flex: 1;
+          padding: 12px 16px;
+          border: 1px solid #e5e5e5;
+          border-radius: 8px;
+          font-size: 14px;
+          color: #333;
+          background: #fff;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+
+        .prefill-input:focus {
+          border-color: #0a0a0f;
+        }
+
+        .prefill-btn {
+          padding: 12px 20px;
+          background: #0a0a0f;
+          color: #fff;
+          border: none;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.2s;
+        }
+
+        .prefill-btn:hover:not(:disabled) {
+          background: #333;
+        }
+
+        .prefill-btn:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+        }
+
+        .prefill-error {
+          font-size: 12px;
+          color: #d32f2f;
+          margin-top: 6px;
+        }
+
+        .prefill-success {
+          font-size: 12px;
+          color: #2e7d32;
+          margin-top: 6px;
+          font-weight: 600;
+        }
+
         .sent-modal-overlay {
           position: fixed;
           inset: 0;
@@ -941,6 +1224,13 @@ export default function InvoiceEditorPage() {
 
         .sent-modal-close:hover {
           background: #333;
+        }
+
+        @media (max-width: 640px) {
+          .prefill-row {
+            flex-direction: column;
+            align-items: stretch;
+          }
         }
       `}</style>
     </section>

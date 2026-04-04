@@ -1,11 +1,12 @@
 ﻿type UnknownRecord = Record<string, unknown>;
 
-const REQUEST_TIMEOUT_MS = 1800;
-const MAX_PROXY_TIME_MS = 7000;
+const REQUEST_TIMEOUT_MS = 12000;
+const MAX_PROXY_TIME_MS = 20000;
 const ENDPOINT_PATHS = ["/api/bookings", "/bookings", "/api/leads", "/leads"] as const;
 
 const API_CANDIDATES = [
   process.env.INTERNAL_API_URL,
+  process.env.NEXT_PUBLIC_API_BASE_URL,
   process.env.NEXT_PUBLIC_API_URL,
   process.env.API_BASE_URL,
   process.env.API_URL,
@@ -46,6 +47,21 @@ function getApiCandidates(): string[] {
       API_CANDIDATES.map((value) => cleanApiBase(String(value))).filter(Boolean)
     )
   );
+}
+
+function getRuntimeApiCandidates(req: Request): string[] {
+  const candidates = getApiCandidates();
+
+  try {
+    const currentOrigin = new URL(req.url).origin.replace(/\/+$/, "");
+    if (currentOrigin) {
+      candidates.unshift(currentOrigin);
+    }
+  } catch {
+    // ignore malformed request URLs
+  }
+
+  return Array.from(new Set(candidates));
 }
 
 function buildApiPayload(input: unknown): UnknownRecord {
@@ -216,7 +232,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const candidates = getApiCandidates();
+    const candidates = getRuntimeApiCandidates(req);
     const startedAt = Date.now();
     let upstream: Response | null = null;
 
@@ -248,11 +264,15 @@ export async function POST(req: Request) {
         candidates
       );
 
-      return Response.json({
-        success: true,
-        fallback: true,
-        warning: "Saved locally - API unreachable"
-      });
+      return Response.json(
+        {
+          success: false,
+          fallback: true,
+          error: "Lead service is temporarily unavailable. Your request was saved locally but did not reach the admin inbox.",
+          warning: "Saved locally - API unreachable"
+        },
+        { status: 503 }
+      );
     }
 
     const data = await parseUpstreamPayload(upstream);
@@ -271,10 +291,14 @@ export async function POST(req: Request) {
     console.error("Bookings proxy fatal error:", error);
     await saveFallbackLead(apiPayload);
 
-    return Response.json({
-      success: true,
-      fallback: true,
-      warning: "Saved locally - API unreachable"
-    });
+    return Response.json(
+      {
+        success: false,
+        fallback: true,
+        error: "Lead service is temporarily unavailable. Your request was saved locally but did not reach the admin inbox.",
+        warning: "Saved locally - API unreachable"
+      },
+      { status: 503 }
+    );
   }
 }

@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -182,7 +183,7 @@ export default function InvoiceDetailViewPage() {
             <MessageSquare size={14} /> Send Reminder
           </a>
 
-          <Link href={`/zero-control/invoices/${invoice.id}`} className="px-4 py-2 rounded-lg border border-black/10 bg-white text-sm font-semibold">
+          <Link href={`/zero-control/invoices/${invoice.id}` as Route} className="px-4 py-2 rounded-lg border border-black/10 bg-white text-sm font-semibold">
             Edit Invoice
           </Link>
         </div>

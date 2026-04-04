@@ -43,6 +43,10 @@ export const env = {
   recaptchaSecretKey: cleanEnvValue(process.env.RECAPTCHA_SECRET_KEY),
   recaptchaMinScore: Number(process.env.RECAPTCHA_MIN_SCORE ?? "0.5"),
   clientOrigin: cleanEnvValue(process.env.CLIENT_ORIGIN, "http://localhost:3000"),
+  webBaseUrl: cleanEnvValue(
+    process.env.WEB_BASE_URL || process.env.NEXT_PUBLIC_WEB_URL || process.env.CLIENT_ORIGIN,
+    "http://localhost:3000"
+  ),
   googleClientId: GOOGLE_CLIENT_ID,
   googleClientSecret: GOOGLE_CLIENT_SECRET,
   googleRedirectUri: GOOGLE_REDIRECT_URI,

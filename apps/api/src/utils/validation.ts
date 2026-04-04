@@ -96,7 +96,7 @@ export const createCallBookingSchema = z.object({
 export const updateCallBookingStatusSchema = z.object({
   params: z.object({ id: objectIdSchema }),
   body: z.object({
-    status: z.enum(["booked", "completed", "cancelled"])
+    status: z.enum(["booked", "confirmed", "completed", "cancelled"])
   })
 });
 

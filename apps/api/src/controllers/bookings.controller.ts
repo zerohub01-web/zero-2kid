@@ -48,6 +48,17 @@ function getRequestOrigin(req: Request) {
   return `${proto}://${host}`;
 }
 
+function getWebBaseUrl(req?: Request) {
+  const configuredBase = env.webBaseUrl?.replace(/\/$/, "");
+  if (configuredBase) return configuredBase;
+
+  if (req) {
+    return (env.clientOrigin || getRequestOrigin(req)).replace(/\/$/, "");
+  }
+
+  return "http://localhost:3000";
+}
+
 function generateBookingId() {
   const dateStamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
   const random = crypto.randomBytes(3).toString("hex").toUpperCase();
@@ -168,10 +179,9 @@ export async function createBooking(req: Request, res: Response) {
     ipAddress
   });
 
-  const baseUrl = (env.clientOrigin || "http://localhost:3000").replace(/\/$/, "");
+  const baseUrl = getWebBaseUrl(req);
   const trackingUrl = `${baseUrl}/booking-status/${booking.bookingId}`;
   const adminUrl = `${baseUrl}/zero-control`;
-  const proposalBaseUrl = `${getRequestOrigin(req).replace(/\/$/, "")}/api/proposals`;
 
   // Async pipeline should not block primary lead submission response.
   Promise.resolve()
@@ -223,10 +233,10 @@ export async function createBooking(req: Request, res: Response) {
 
       let proposalUrl = "";
       try {
-        const proposal = await generateProposalForLead(booking, proposalBaseUrl);
-        proposalUrl = proposal.proposalUrl;
+        await generateProposalForLead(booking, `${getRequestOrigin(req).replace(/\/$/, "")}/api/proposals`);
+        proposalUrl = `${getWebBaseUrl(req)}/api/proposals/${String(booking._id)}/pdf`;
 
-        booking.proposalUrl = proposal.proposalUrl;
+        booking.proposalUrl = proposalUrl;
         booking.proposalGeneratedAt = new Date();
         await booking.save();
 
@@ -235,7 +245,7 @@ export async function createBooking(req: Request, res: Response) {
           customerName: booking.name,
           service: booking.service,
           bookingId: booking.bookingId,
-          proposalUrl: proposal.proposalUrl
+          proposalUrl
         });
       } catch (proposalError) {
         console.error("Lead proposal generation/email step failed:", proposalError);
@@ -452,6 +462,42 @@ export async function deleteBooking(req: Request, res: Response) {
   });
 
   return res.json({ message: "Booking deleted successfully." });
+}
+
+export async function getBookingDetails(req: Request, res: Response) {
+  const requestedBookingId = String(req.params.id ?? "").trim();
+  if (!requestedBookingId) {
+    return res.status(400).json({ message: "Booking ID is required." });
+  }
+
+  const booking =
+    /^[0-9a-fA-F]{24}$/.test(requestedBookingId)
+      ? await BookingModel.findById(requestedBookingId)
+      : await BookingModel.findOne({ bookingId: requestedBookingId.toUpperCase() });
+
+  if (!booking) {
+    return res.status(404).json({ message: "Booking not found." });
+  }
+
+  const amount = Number(booking.quotedFee ?? booking.servicePriceSnapshot ?? booking.budget ?? 0);
+
+  return res.json({
+    booking: {
+      ...serializeBooking(booking),
+      fullName: booking.name,
+      emailAddress: booking.email,
+      phoneNumber: booking.phone,
+      company: booking.businessType,
+      business: booking.businessType,
+      businessType: booking.businessType,
+      serviceType: booking.service,
+      amount,
+      totalAmount: amount,
+      address: "",
+      city: "",
+      country: "IN"
+    }
+  });
 }
 
 export async function getBookingStatus(req: Request, res: Response) {

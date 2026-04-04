@@ -121,7 +121,7 @@ export async function getCallBookings(req: Request, res: Response) {
   const query: Record<string, unknown> = {};
 
   if (status && status !== "all") {
-    if (!["booked", "completed", "cancelled"].includes(status)) {
+    if (!["booked", "confirmed", "completed", "cancelled"].includes(status)) {
       return res.status(400).json({ message: "Invalid call status filter." });
     }
     query.status = status;
@@ -166,7 +166,7 @@ export async function processUpcomingCallReminders() {
   const reminderTo = new Date(now.getTime() + 75 * 60 * 1000);
 
   const pending = await CallBookingModel.find({
-    status: "booked",
+    status: { $in: ["booked", "confirmed"] },
     reminderSentAt: null,
     timeSlot: { $gte: reminderFrom, $lte: reminderTo }
   }).limit(100);

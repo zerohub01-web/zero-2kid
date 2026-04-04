@@ -645,7 +645,7 @@ export default function HomePage() {
               </p>
               <h3 className="text-2xl font-display text-[var(--ink)] mt-3">{post.title}</h3>
               <p className="text-sm text-[var(--muted)] mt-3 leading-relaxed flex-1">{post.description}</p>
-              <Link href={`/blog/${post.slug}`} className="mt-5 inline-flex text-sm font-semibold underline">
+              <Link href={`/blog/${post.slug}` as Route} className="mt-5 inline-flex text-sm font-semibold underline">
                 Read article
               </Link>
             </article>

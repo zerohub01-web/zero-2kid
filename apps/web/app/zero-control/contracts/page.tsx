@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -97,7 +98,7 @@ export default function ZeroControlContractsPage() {
             <button type="button" onClick={() => void fetchData()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-black/10 bg-white hover:bg-black/5 text-sm">
               <RefreshCcw size={14} /> Refresh
             </button>
-            <Link href="/zero-control/contracts/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--ink)] text-white text-sm font-semibold">
+            <Link href={"/zero-control/contracts/new" as Route} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--ink)] text-white text-sm font-semibold">
               <Plus size={14} /> New Contract
             </Link>
           </div>
@@ -176,10 +177,10 @@ export default function ZeroControlContractsPage() {
                     <td className="py-3">{new Date(row.createdAt).toLocaleDateString("en-IN")}</td>
                     <td className="py-3">
                       <div className="flex flex-wrap gap-2">
-                        <Link href={`/zero-control/contracts/${row.id}`} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
+                        <Link href={`/zero-control/contracts/${row.id}` as Route} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
                           Edit
                         </Link>
-                        <Link href={`/zero-control/contracts/${row.id}/view`} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
+                        <Link href={`/zero-control/contracts/${row.id}/view` as Route} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
                           View
                         </Link>
                         <button type="button" onClick={() => void sendContract(row.id)} disabled={sendingId === row.id} className="px-2.5 py-1 rounded-md bg-sky-100 text-sky-800 text-xs font-semibold disabled:opacity-60 inline-flex items-center gap-1">

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { loginAdmin, loginAdminFromCustomer, logoutAdmin, me } from "../controllers/adminAuth.controller.js";
 import { getAnalytics } from "../controllers/analytics.controller.js";
-import { deleteBooking, getBookings, updateBookingStatus } from "../controllers/bookings.controller.js";
+import { deleteBooking, getBookingDetails, getBookings, updateBookingStatus } from "../controllers/bookings.controller.js";
 import { getCallBookings, updateCallBookingStatus } from "../controllers/calls.controller.js";
 import { getFollowUps } from "../controllers/followUp.controller.js";
 import { createService, deleteService, getServices, updateService } from "../controllers/services.controller.js";
@@ -64,6 +64,8 @@ adminRouter.patch(
 
 adminRouter.get("/bookings", requireAuth, requireRole(["SUPER_ADMIN", "MANAGER"]), getBookings);
 adminRouter.get("/leads", requireAuth, requireRole(["SUPER_ADMIN", "MANAGER"]), getBookings);
+adminRouter.get("/bookings/:id", requireAuth, requireRole(["SUPER_ADMIN", "MANAGER"]), getBookingDetails);
+adminRouter.get("/leads/:id", requireAuth, requireRole(["SUPER_ADMIN", "MANAGER"]), getBookingDetails);
 adminRouter.patch(
   "/bookings/:id",
   requireAuth,

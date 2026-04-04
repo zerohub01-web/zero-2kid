@@ -1,116 +1,167 @@
 import { Request, Response } from "express";
+import { InvoiceModel } from "../db/schema.js";
+import { ActivityLogModel } from "../models/ActivityLog.js";
 import { BookingModel, toCanonicalBookingStatus } from "../models/Booking.js";
+import { serializeActivityLog } from "../services/activity.service.js";
 
-function startOfHour() {
-  const date = new Date();
-  date.setMinutes(0, 0, 0);
-  return date;
+type AnalyticsFilter = "hour" | "today" | "week" | "month" | "all";
+
+function getDateRange(filter: AnalyticsFilter) {
+  const now = new Date();
+  const end = new Date(now);
+  const start = new Date(now);
+
+  switch (filter) {
+    case "hour":
+      start.setHours(now.getHours() - 1, now.getMinutes(), 0, 0);
+      break;
+    case "today":
+      start.setHours(0, 0, 0, 0);
+      break;
+    case "week":
+      start.setDate(now.getDate() - 7);
+      break;
+    case "month":
+      start.setMonth(now.getMonth() - 1);
+      break;
+    case "all":
+    default:
+      start.setFullYear(2020, 0, 1);
+      start.setHours(0, 0, 0, 0);
+      break;
+  }
+
+  if (filter === "all") {
+    return {
+      start,
+      end,
+      previousStart: null,
+      previousEnd: null
+    };
+  }
+
+  const span = end.getTime() - start.getTime();
+  const previousEnd = new Date(start);
+  const previousStart = new Date(start.getTime() - span);
+
+  return {
+    start,
+    end,
+    previousStart,
+    previousEnd
+  };
 }
 
-function startOfToday() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
+function groupLabel(date: Date, filter: AnalyticsFilter) {
+  if (filter === "hour") {
+    return date.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Kolkata"
+    });
+  }
 
-function startOfWeek() {
-  const date = startOfToday();
-  const day = date.getDay();
-  const diff = date.getDate() - day;
-  date.setDate(diff);
-  return date;
-}
-
-function startOfPrevMonth() {
-  const date = new Date();
-  date.setDate(1);
-  date.setMonth(date.getMonth() - 1);
-  date.setHours(0,0,0,0);
-  return date;
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "Asia/Kolkata"
+  });
 }
 
 export async function getAnalytics(req: Request, res: Response) {
-  const filter = (req.query.filter as string) || "month";
-  const from = req.query.from as string | undefined;
-  const to = req.query.to as string | undefined;
+  const rawFilter = typeof req.query.filter === "string" ? req.query.filter : "today";
+  const filter = (["hour", "today", "week", "month", "all"].includes(rawFilter) ? rawFilter : "today") as AnalyticsFilter;
+  const range = getDateRange(filter);
 
-  let startDate = new Date();
-  const endDate = new Date();
+  const bookingQuery = { createdAt: { $gte: range.start, $lte: range.end } };
+  const invoiceQuery = { status: "PAID", createdAt: { $gte: range.start, $lte: range.end } };
+  const previousInvoiceQuery =
+    range.previousStart && range.previousEnd
+      ? {
+          status: "PAID",
+          createdAt: {
+            $gte: range.previousStart,
+            $lt: range.previousEnd
+          }
+        }
+      : null;
 
-  // Handle various filter granularities as requested by user
-  switch (filter) {
-    case "hour":
-      startDate = startOfHour();
-      break;
-    case "today":
-      startDate = startOfToday();
-      break;
-    case "week":
-      startDate = startOfWeek();
-      break;
-    case "month":
-      startDate = new Date();
-      startDate.setDate(1);
-      startDate.setHours(0,0,0,0);
-      break;
-    case "all":
-      startDate = new Date(0);
-      break;
-    case "custom":
-      if (from && to) {
-        startDate = new Date(from);
-        endDate.setTime(new Date(to).getTime());
-      }
-      break;
-    default:
-      startDate.setMonth(startDate.getMonth() - 1);
-  }
+  const [bookings, paidInvoices, previousPaidInvoices, recentActivity] = await Promise.all([
+    BookingModel.find(bookingQuery).sort({ createdAt: -1 }).lean(),
+    InvoiceModel.find(invoiceQuery).select("totalAmount").lean(),
+    previousInvoiceQuery ? InvoiceModel.find(previousInvoiceQuery).select("totalAmount").lean() : Promise.resolve([]),
+    ActivityLogModel.find().sort({ timestamp: -1 }).limit(20)
+  ]);
 
-  const bookings = await BookingModel.find({ createdAt: { $gte: startDate, $lte: endDate } });
-  
-  // Growth calculation (compare to previous period of same duration)
-  const duration = endDate.getTime() - startDate.getTime();
-  const prevStart = new Date(startDate.getTime() - duration);
-  const prevBookings = await BookingModel.find({ createdAt: { $gte: prevStart, $lt: startDate } });
-
-  const totalBookings = bookings.length;
-  const revenue = bookings.reduce((sum, b) => sum + (b.servicePriceSnapshot || 0), 0);
-  const prevRevenue = prevBookings.reduce((sum, b) => sum + (b.servicePriceSnapshot || 0), 0);
-  const growthPercent = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0;
-
-  const emails = bookings.map((b) => b.email);
-  const uniqueEmails = new Set(emails);
-  const repeatCustomers = emails.length - uniqueEmails.size;
-  const convertedLeads = bookings.filter(
-    (booking) => (toCanonicalBookingStatus(booking.status) ?? "new") === "converted"
-  ).length;
+  const totalRequests = bookings.length;
+  const activeUsers = new Set(
+    bookings.map((booking) => String(booking.email ?? "").trim().toLowerCase()).filter(Boolean)
+  ).size;
+  const repeatCustomers = Math.max(
+    0,
+    bookings.length -
+      new Set(bookings.map((booking) => String(booking.email ?? "").trim().toLowerCase()).filter(Boolean)).size
+  );
   const highValueLeads = bookings.filter((booking) => booking.score === "high").length;
-  const conversionRate = totalBookings > 0 ? (convertedLeads / totalBookings) * 100 : 0;
+  const convertedLeads = bookings.filter(
+    (booking) => (toCanonicalBookingStatus(String(booking.status ?? "")) ?? "new") === "converted"
+  ).length;
+  const conversionRate = totalRequests > 0 ? Math.round((convertedLeads / totalRequests) * 100) : 0;
 
   const serviceCount = new Map<string, number>();
-  bookings.forEach((b) => serviceCount.set(b.service, (serviceCount.get(b.service) ?? 0) + 1));
-  const topService = [...serviceCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "None";
+  for (const booking of bookings) {
+    const service = String(booking.service ?? "").trim() || "Unknown";
+    serviceCount.set(service, (serviceCount.get(service) ?? 0) + 1);
+  }
 
-  // Aggregate stats for charts based on granularity
-  const timeKey = filter === "hour" ? "minutes" : "date";
+  const topService =
+    [...serviceCount.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || "None";
+
+  const currentRevenue = paidInvoices.reduce((sum, invoice) => sum + Number(invoice.totalAmount ?? 0), 0);
+  const previousRevenue = previousPaidInvoices.reduce((sum, invoice) => sum + Number(invoice.totalAmount ?? 0), 0);
+  const revenueGrowth =
+    previousRevenue > 0 ? Math.round(((currentRevenue - previousRevenue) / previousRevenue) * 100) : 0;
+
+  const bookingsOverTimeMap = new Map<string, number>();
+  for (const booking of bookings) {
+    const createdAt = booking.createdAt instanceof Date ? booking.createdAt : new Date(booking.createdAt);
+    const label = groupLabel(createdAt, filter);
+    bookingsOverTimeMap.set(label, (bookingsOverTimeMap.get(label) ?? 0) + 1);
+  }
 
   return res.json({
+    period: filter,
+    stats: {
+      totalRequests,
+      conversionRate,
+      revenue: {
+        amount: currentRevenue,
+        currency: "INR",
+        symbol: "\u20B9",
+        growth: revenueGrowth
+      },
+      activeUsers,
+      topService
+    },
     kpis: {
-      totalBookings,
-      revenue,
-      growthPercent: Number(growthPercent.toFixed(1)),
-      activeCustomers: uniqueEmails.size,
+      totalBookings: totalRequests,
+      revenue: currentRevenue,
+      growthPercent: revenueGrowth,
+      activeCustomers: activeUsers,
       highValueLeads,
-      conversionRate: Number(conversionRate.toFixed(1)),
+      conversionRate,
       repeatCustomers,
       topService
     },
+    recentActivity: recentActivity.map((item) => serializeActivityLog(item)),
     charts: {
-      bookingsOverTime: bookings.map((b) => ({ 
-        label: new Date(b.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        count: 1 
+      bookingsOverTime: [...bookingsOverTimeMap.entries()].map(([label, count]) => ({
+        label,
+        count
       })),
-      servicePerformance: [...serviceCount.entries()].map(([service, count]) => ({ service, count }))
+      servicePerformance: [...serviceCount.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .map(([service, count]) => ({ service, count }))
     }
   });
 }

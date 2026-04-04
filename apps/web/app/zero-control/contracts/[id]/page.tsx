@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import SignaturePad from "signature_pad";
@@ -336,7 +337,7 @@ export default function ContractEditorPage() {
       const nextId = response.data?.id || contractId;
       if (isNew && nextId && nextId !== "new") {
         setContractId(nextId);
-        router.replace(`/zero-control/contracts/${nextId}`);
+        router.replace(`/zero-control/contracts/${nextId}` as Route);
       }
 
       setForm((prev) => ({
@@ -419,7 +420,7 @@ export default function ContractEditorPage() {
     try {
       await api.delete(`/api/contracts/${contractId}`);
       toast.success("Contract deleted.");
-      router.push("/zero-control/contracts");
+      router.push("/zero-control/contracts" as Route);
     } catch (error) {
       console.error(error);
       toast.error("Failed to delete contract.");
@@ -441,7 +442,7 @@ export default function ContractEditorPage() {
         return;
       }
       toast.success("Draft created from booking.");
-      router.push(`/zero-control/contracts/${createdId}`);
+      router.push(`/zero-control/contracts/${createdId}` as Route);
     } catch (error) {
       console.error(error);
       toast.error("Unable to prefill from booking.");
