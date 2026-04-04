@@ -1,11 +1,17 @@
 ﻿"use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../../lib/api";
 import { trackEvent } from "../../lib/analytics";
+import {
+  RecaptchaWidgetStatus,
+  extractCaptchaErrorCode,
+  getCaptchaErrorMessage
+} from "../../lib/recaptcha";
 import { buildAdminPing, buildWhatsAppLink } from "../../utils/whatsapp";
+import { RecaptchaCheckbox, RecaptchaCheckboxHandle } from "../security/RecaptchaCheckbox";
 
 type BookingFormValues = {
   name: string;
@@ -142,6 +148,11 @@ function extractFieldErrors(data: unknown): string[] {
 }
 
 function resolveErrorMessages(status: number, data: unknown): string[] {
+  const captchaCode = extractCaptchaErrorCode(data);
+  if (captchaCode) {
+    return [getCaptchaErrorMessage(captchaCode)];
+  }
+
   if (status === 429) {
     return ["Too many attempts. Please wait a moment and try again."];
   }
@@ -207,6 +218,12 @@ export function BookingRequestForm() {
   const [submitErrors, setSubmitErrors] = useState<string[]>([]);
   const [successPayload, setSuccessPayload] = useState<SuccessPayload | null>(null);
   const [memoryGreeting, setMemoryGreeting] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState("");
+  const [captchaStatus, setCaptchaStatus] = useState<RecaptchaWidgetStatus>({
+    state: "idle",
+    message: ""
+  });
+  const recaptchaRef = useRef<RecaptchaCheckboxHandle | null>(null);
 
   const errors = useMemo(() => validateForm(values), [values]);
   const isValid = Object.values(errors).every((error) => !error);
@@ -266,57 +283,14 @@ export function BookingRequestForm() {
     }
   }, []);
 
-  useEffect(() => {
-    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-    if (!siteKey || siteKey === "your_site_key_here") return;
-
-    if (document.querySelector("#recaptcha-script")) return;
-
-    const script = document.createElement("script");
-    script.id = "recaptcha-script";
-    script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => console.warn("reCAPTCHA script failed to load");
-    document.head.appendChild(script);
-  }, []);
-
   function updateField(field: FieldKey, value: string) {
     setValues((previous) => ({ ...previous, [field]: value }));
     setTouched((previous) => ({ ...previous, [field]: true }));
   }
 
-  const getRecaptchaToken = async (action: string): Promise<string | null> => {
-    try {
-      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-
-      if (!siteKey || siteKey.trim() === "" || siteKey === "your_site_key_here") {
-        console.warn("WARNING: reCAPTCHA site key not configured - skipping");
-        return null;
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("reCAPTCHA timeout")), 5000);
-
-        if (typeof window !== "undefined" && window.grecaptcha) {
-          window.grecaptcha.ready(() => {
-            clearTimeout(timeout);
-            resolve();
-          });
-        } else {
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
-
-      if (typeof window === "undefined" || !window.grecaptcha?.execute) return null;
-
-      const token = await window.grecaptcha.execute(siteKey, { action });
-      return token || null;
-    } catch (err) {
-      console.warn("reCAPTCHA failed silently:", err);
-      return null;
-    }
+  const resetRecaptcha = () => {
+    recaptchaRef.current?.reset();
+    setRecaptchaToken("");
   };
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -338,7 +312,14 @@ export function BookingRequestForm() {
       return;
     }
 
-    const recaptchaToken = await getRecaptchaToken("booking_submit");
+    if (!recaptchaToken) {
+      const message = getCaptchaErrorMessage(
+        captchaStatus.code ?? (captchaStatus.state === "expired" ? "captcha_expired" : "captcha_required")
+      );
+      setSubmitErrors([message]);
+      toast.error(message);
+      return;
+    }
 
     setSending(true);
 
@@ -365,11 +346,13 @@ export function BookingRequestForm() {
         data = await res.json();
       } catch (parseError) {
         console.error("Booking response parse failed:", parseError);
+        resetRecaptcha();
         setSubmitErrors([`Server error (${res.status}). Please try again.`]);
         return;
       }
 
       if (!res.ok) {
+        resetRecaptcha();
         const failures = resolveErrorMessages(res.status, data);
         setSubmitErrors(failures);
         toast.error(failures[0] ?? "Request failed.");
@@ -456,6 +439,7 @@ Thank you for choosing ZeroOps! ${SYMBOLS.rocket}
       toast.success("Request submitted successfully.");
     } catch (error) {
       console.error("Booking submit failed:", error);
+      resetRecaptcha();
       const fallback = "Service is temporarily unavailable. Please try again shortly.";
       setSubmitErrors([fallback]);
       toast.error(fallback);
@@ -633,7 +617,25 @@ Thank you for choosing ZeroOps! ${SYMBOLS.rocket}
 
       <div className="rounded-xl border border-black/10 bg-white/70 px-4 py-3 text-xs text-[var(--muted)] flex items-start gap-2">
         <ShieldCheck size={16} className="mt-0.5 shrink-0" />
-        <p>Protected by rate limiting, honeypot filtering, and optional captcha verification.</p>
+        <p>Protected by rate limiting, honeypot filtering, and a required CAPTCHA security check.</p>
+      </div>
+
+      <div className="rounded-xl border border-black/10 bg-white/70 px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">Security Check</p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Complete the CAPTCHA before submitting so we can block spam and route your request to the team.
+        </p>
+        <RecaptchaCheckbox
+          ref={recaptchaRef}
+          className="mt-3"
+          onTokenChange={(token) => {
+            setRecaptchaToken(token);
+            if (token) {
+              setSubmitErrors([]);
+            }
+          }}
+          onStatusChange={(status) => setCaptchaStatus(status)}
+        />
       </div>
 
       {submitErrors.length > 0 ? (

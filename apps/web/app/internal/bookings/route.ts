@@ -25,13 +25,6 @@ function asString(value: unknown): string {
   return "";
 }
 
-function asBoolean(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return value.trim().toLowerCase() === "true";
-  if (typeof value === "number") return value === 1;
-  return false;
-}
-
 function toRecord(value: unknown): UnknownRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as UnknownRecord;
@@ -78,7 +71,6 @@ function buildApiPayload(input: unknown): UnknownRecord {
   const date = asString(source.date);
   const website = asString(source.website);
   const recaptchaToken = asString(source.recaptchaToken);
-  const recaptchaSkipped = asBoolean(source.recaptchaSkipped);
 
   const payload: UnknownRecord = {
     name,
@@ -93,7 +85,6 @@ function buildApiPayload(input: unknown): UnknownRecord {
   if (date) payload.date = date;
   if (website) payload.website = website;
   if (recaptchaToken) payload.recaptchaToken = recaptchaToken;
-  if (recaptchaSkipped) payload.recaptchaSkipped = true;
 
   return payload;
 }
@@ -219,10 +210,7 @@ export async function POST(req: Request) {
     apiPayload = buildApiPayload(body);
     const forwardedFor = (req.headers.get("x-forwarded-for") ?? "").trim();
     const hasCaptchaToken = Boolean(asString(apiPayload.recaptchaToken));
-    const captchaSkipped = asBoolean(apiPayload.recaptchaSkipped);
-    console.log(
-      `📨 Booking submission — captcha: ${hasCaptchaToken ? "present" : captchaSkipped ? "skipped" : "missing"}`
-    );
+    console.log(`📨 Booking submission — captcha: ${hasCaptchaToken ? "present" : "missing"}`);
 
     const missing = getMissingRequiredFields(apiPayload);
     if (missing.length > 0) {

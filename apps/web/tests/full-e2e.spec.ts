@@ -134,7 +134,7 @@ test.describe("Booking Form", () => {
     await page.waitForTimeout(5000);
 
     const success = page.getByText(/success|received|thank|done|booking submitted/i).first();
-    const knownError = page.getByText(/unavailable|failed|error|try again|validation/i).first();
+    const knownError = page.getByText(/unavailable|failed|error|try again|validation|security check|captcha/i).first();
 
     const hasSuccess = await success.isVisible().catch(() => false);
     const hasError = await knownError.isVisible().catch(() => false);
@@ -148,18 +148,24 @@ test.describe("Booking Form", () => {
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
-  test("T5.15 - reCAPTCHA does NOT block submission", async ({ page }) => {
+  test("T5.15 - reCAPTCHA blocks submission until completed", async ({ page }) => {
     await page.goto(`${BASE}/book`);
 
     await page.fill('input[name="name"], input[placeholder*="name" i]', "CAPTCHA Test").catch(() => undefined);
     await page.fill('input[name="email"], input[type="email"]', "captcha@test.com").catch(() => undefined);
     await page.fill('input[name="phone"], input[type="tel"]', "8888888888").catch(() => undefined);
     await page.fill('input[name="businessType"], input[placeholder*="business" i]', "Startup").catch(() => undefined);
+    const serviceSelect = page.locator('select[name="service"], [name="serviceType"]');
+    if (await serviceSelect.count()) {
+      await serviceSelect.first().selectOption({ index: 1 });
+    }
+    await page.fill('input[name="teamSize"], input[placeholder*="team" i]', "2-10").catch(() => undefined);
+    await page.fill("textarea", "Need a marketing dashboard and reporting setup.").catch(() => undefined);
 
     await page.getByRole("button", { name: /submit|book|request/i }).first().click();
-    await page.waitForTimeout(4000);
-
-    await expect(page.getByText(/Verification failed\. Please refresh and try again\./i)).not.toBeVisible();
+    await expect(page.getByText(/Complete the CAPTCHA security check before submitting/i).first()).toBeVisible({
+      timeout: 5000
+    });
   });
 });
 

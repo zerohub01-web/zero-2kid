@@ -2,6 +2,8 @@
 
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Send, X } from "lucide-react";
+import { extractCaptchaErrorCode, getCaptchaErrorMessage } from "../../lib/recaptcha";
+import { RecaptchaCheckbox, RecaptchaCheckboxHandle } from "../security/RecaptchaCheckbox";
 
 type StepType = "text" | "options";
 type ChatRole = "bot" | "user";
@@ -176,7 +178,7 @@ function sanitizeErrorMessage(message: string): string {
 
   const isCaptchaError = captchaKeywords.some((keyword) => lowered.includes(keyword));
   if (isCaptchaError) {
-    return "Submission failed. Please try again.";
+    return getCaptchaErrorMessage("captcha_invalid");
   }
 
   return value;
@@ -214,9 +216,14 @@ export function LeadCaptureWidget() {
   const [adminWhatsAppLink, setAdminWhatsAppLink] = useState("");
   const [canRetry, setCanRetry] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [awaitingCaptcha, setAwaitingCaptcha] = useState(false);
+  const [pendingSubmission, setPendingSubmission] = useState<Record<string, string> | null>(null);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaStatusCode, setCaptchaStatusCode] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const otherInputRef = useRef<HTMLInputElement>(null);
+  const recaptchaRef = useRef<RecaptchaCheckboxHandle | null>(null);
 
   const currentStep = useMemo(() => CHAT_STEPS[currentStepIndex], [currentStepIndex]);
 
@@ -269,78 +276,17 @@ export function LeadCaptureWidget() {
     }
   }, [showOtherInput]);
 
-  useEffect(() => {
-    if (!open) return;
-    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-    if (!siteKey || siteKey === "your_site_key_here") return;
-    if (document.querySelector("#recaptcha-script")) return;
-
-    const script = document.createElement("script");
-    script.id = "recaptcha-script";
-    script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => console.warn("reCAPTCHA script failed to load");
-    document.head.appendChild(script);
-  }, [open]);
-
-  const getRecaptchaToken = async (action: string): Promise<string | null> => {
-    try {
-      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-
-      if (!siteKey || siteKey.trim() === "" || siteKey === "your_site_key_here") {
-        return null;
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("reCAPTCHA timeout")), 5000);
-        if (typeof window !== "undefined" && window.grecaptcha) {
-          window.grecaptcha.ready(() => {
-            clearTimeout(timeout);
-            resolve();
-          });
-        } else {
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
-
-      if (typeof window === "undefined" || !window.grecaptcha?.execute) return null;
-      const token = await window.grecaptcha.execute(siteKey, { action });
-      return token || null;
-    } catch {
-      return null;
-    }
+  const resetCaptcha = () => {
+    recaptchaRef.current?.reset();
+    setCaptchaToken("");
+    setCaptchaStatusCode("");
   };
 
-  const handleFinalSubmit = async (finalAnswers: Record<string, string>) => {
+  const handleFinalSubmit = async (finalAnswers: Record<string, string>, token: string) => {
     setIsTyping(true);
     setIsSubmitting(true);
     setCanRetry(false);
     try {
-      let recaptchaToken: string | null = null;
-      try {
-        const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-        if (
-          siteKey &&
-          siteKey.trim() !== "" &&
-          siteKey !== "your_site_key_here" &&
-          typeof window !== "undefined" &&
-          window.grecaptcha
-        ) {
-          await Promise.race([
-            new Promise<void>((resolve) => window.grecaptcha.ready(resolve)),
-            new Promise<void>((resolve) => setTimeout(resolve, 3000))
-          ]);
-
-          recaptchaToken = await window.grecaptcha
-            .execute(siteKey, { action: "chatbot_submit" })
-            .catch(() => null);
-        }
-      } catch {
-        recaptchaToken = null;
-      }
-
       const res = await fetch("/internal/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -359,7 +305,7 @@ export function LeadCaptureWidget() {
           ]
             .filter(Boolean)
             .join(" | "),
-          ...(recaptchaToken ? { recaptchaToken } : { recaptchaSkipped: true })
+          recaptchaToken: token
         })
       });
 
@@ -371,6 +317,8 @@ export function LeadCaptureWidget() {
       setIsTyping(false);
 
       if (isSuccess) {
+        setAwaitingCaptcha(false);
+        setPendingSubmission(null);
         setIsSubmitted(true);
         setCanRetry(false);
         setMessages((prev) => [
@@ -401,12 +349,15 @@ export function LeadCaptureWidget() {
         await wait(1200);
         setMessages((prev) => [...prev, { role: "bot", text: "__WHATSAPP_CTA__" }]);
       } else {
+        const captchaCode = extractCaptchaErrorCode(data);
         const errMsg = data?.error || data?.message || "Something went wrong. Please try again.";
-        const safeMessage = sanitizeErrorMessage(String(errMsg));
-        setCanRetry(true);
+        const safeMessage = captchaCode ? getCaptchaErrorMessage(captchaCode) : sanitizeErrorMessage(String(errMsg));
+        resetCaptcha();
+        setCanRetry(!captchaCode);
         setMessages((prev) => [...prev, { role: "bot", text: `❌ ${safeMessage}` }]);
       }
     } catch {
+      resetCaptcha();
       setIsTyping(false);
       setCanRetry(true);
       setMessages((prev) => [
@@ -461,8 +412,15 @@ export function LeadCaptureWidget() {
       setIsTyping(true);
       await wait(1000);
       setIsTyping(false);
-      setMessages((prev) => [...prev, { role: "bot", text: "Perfect. Processing your details now..." }]);
-      await handleFinalSubmit(newAnswers);
+      setPendingSubmission(newAnswers);
+      setAwaitingCaptcha(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "bot",
+          text: "Almost done. Complete the security check below, then send your request."
+        }
+      ]);
       return;
     }
 
@@ -533,7 +491,25 @@ export function LeadCaptureWidget() {
     setIsSubmitted(false);
     setCanRetry(false);
     setRetryCount(0);
+    setAwaitingCaptcha(false);
+    setPendingSubmission(null);
+    resetCaptcha();
     setMessages([{ role: "bot", text: CHAT_STEPS[0].question }]);
+  };
+
+  const handleCaptchaSubmit = async () => {
+    if (!pendingSubmission || isSubmitting) return;
+
+    if (!captchaToken) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", text: `❌ ${getCaptchaErrorMessage(captchaStatusCode || "captcha_required")}` }
+      ]);
+      return;
+    }
+
+    setMessages((prev) => [...prev, { role: "bot", text: "Perfect. Processing your details now..." }]);
+    await handleFinalSubmit(pendingSubmission, captchaToken);
   };
 
   return (
@@ -610,7 +586,7 @@ export function LeadCaptureWidget() {
             </div>
           ) : null}
 
-          {!isSubmitted && !isTyping && !showWelcomeBack ? (
+          {!isSubmitted && !isTyping && !showWelcomeBack && !awaitingCaptcha ? (
             <div className="input-area">
               {currentStep?.type === "options" && !showOtherInput ? (
                 <div className="options-wrapper">
@@ -685,6 +661,36 @@ export function LeadCaptureWidget() {
             </div>
           ) : null}
 
+          {awaitingCaptcha && !isSubmitted && !isTyping ? (
+            <div className="input-area captcha-panel">
+              <div className="captcha-card">
+                <p className="captcha-title">Security Check</p>
+                <p className="captcha-copy">Complete the CAPTCHA before we send your request to the ZERO OPS team.</p>
+                <div className="captcha-widget-wrap">
+                  <RecaptchaCheckbox
+                    ref={recaptchaRef}
+                    theme="dark"
+                    onTokenChange={(token) => {
+                      setCaptchaToken(token);
+                      setCanRetry(false);
+                    }}
+                    onStatusChange={(status) => {
+                      setCaptchaStatusCode(status.code ?? "");
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="captcha-submit-btn"
+                  onClick={() => void handleCaptchaSubmit()}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Send Request"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {canRetry && !isSubmitted ? (
             <div className="retry-container">
               <p className="retry-text">
@@ -697,7 +703,9 @@ export function LeadCaptureWidget() {
                 onClick={() => {
                   setCanRetry(false);
                   setRetryCount((prev) => prev + 1);
-                  void handleFinalSubmit(answers);
+                  if (pendingSubmission) {
+                    void handleCaptchaSubmit();
+                  }
                 }}
               >
                 🔄 Try Again
@@ -1001,6 +1009,54 @@ export function LeadCaptureWidget() {
               padding: 16px;
               border-top: 1px solid rgba(255, 255, 255, 0.06);
               text-align: center;
+            }
+
+            .captcha-panel {
+              padding: 12px;
+            }
+
+            .captcha-card {
+              border-radius: 16px;
+              border: 1px solid rgba(255, 255, 255, 0.12);
+              background: rgba(7, 20, 38, 0.96);
+              padding: 14px;
+            }
+
+            .captcha-title {
+              font-size: 13px;
+              font-weight: 700;
+              color: #ffffff;
+            }
+
+            .captcha-copy {
+              margin-top: 4px;
+              font-size: 12px;
+              line-height: 1.5;
+              color: rgba(255, 255, 255, 0.72);
+            }
+
+            .captcha-widget-wrap {
+              margin-top: 12px;
+              overflow-x: auto;
+            }
+
+            .captcha-submit-btn {
+              margin-top: 12px;
+              width: 100%;
+              border-radius: 12px;
+              border: 1px solid rgba(0, 200, 150, 0.24);
+              background: #00c896;
+              color: #031016;
+              font-size: 13px;
+              font-weight: 700;
+              padding: 11px 14px;
+              cursor: pointer;
+              transition: transform 0.18s ease, opacity 0.18s ease;
+            }
+
+            .captcha-submit-btn:disabled {
+              cursor: not-allowed;
+              opacity: 0.6;
             }
 
             .retry-text {

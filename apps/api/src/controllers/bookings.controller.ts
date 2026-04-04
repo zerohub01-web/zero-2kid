@@ -120,8 +120,12 @@ export async function createBooking(req: Request, res: Response) {
   const recaptchaToken = String(req.body.recaptchaToken ?? "").trim();
   const recaptchaResult = await verifyRecaptchaToken(recaptchaToken, ipAddress);
   if (!recaptchaResult.ok) {
-    console.warn("[Booking] CAPTCHA rejected:", recaptchaResult.reason);
-    return res.status(400).json({ error: "CAPTCHA verification failed. Please try again." });
+    console.warn("[Booking] CAPTCHA rejected:", recaptchaResult.code, recaptchaResult.reason);
+    const status = recaptchaResult.code === "captcha_unavailable" ? 503 : 400;
+    return res.status(status).json({
+      error: recaptchaResult.reason,
+      code: recaptchaResult.code
+    });
   }
 
   const cleanName = sanitizeSingleLine(req.body.name, 80);

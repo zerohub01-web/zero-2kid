@@ -10,7 +10,7 @@ export default function BookPage() {
     if (!siteKey || siteKey === "your_site_key_here") {
       console.warn(
         "WARNING: NEXT_PUBLIC_RECAPTCHA_SITE_KEY not set.",
-        "Booking form will work without reCAPTCHA in dev mode."
+        "Booking form requires a Google reCAPTCHA v2 checkbox site key."
       );
     }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
