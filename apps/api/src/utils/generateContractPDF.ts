@@ -1,5 +1,6 @@
 import puppeteer from "puppeteer";
 import type { Contract } from "../db/schema.js";
+import { generateSimplePdf } from "./simplePdf.js";
 
 export type ContractForPdf = Omit<Contract, "createdAt" | "updatedAt"> & {
   id: string;
@@ -676,9 +677,9 @@ async function launchPdfBrowser() {
 }
 
 export async function generateContractPDF(contract: ContractForPdf): Promise<Buffer> {
-  const browser = await launchPdfBrowser();
-
   try {
+    const browser = await launchPdfBrowser();
+    try {
     const page = await browser.newPage();
     await page.setContent(buildContractHTML(contract), { waitUntil: "networkidle0" });
     const pdf = await page.pdf({
@@ -692,7 +693,29 @@ export async function generateContractPDF(contract: ContractForPdf): Promise<Buf
       }
     });
     return Buffer.from(pdf);
-  } finally {
-    await browser.close();
+    } finally {
+      await browser.close();
+    }
+  } catch (error) {
+    console.error("[PDF] Contract styled PDF generation failed. Falling back to simplified PDF.", error);
+    return generateSimplePdf({
+      title: "ZERO OPS - Service Agreement",
+      subtitle: contract.contractNumber || "",
+      rows: [
+        { label: "Contract Number", value: contract.contractNumber || "-" },
+        { label: "Client Name", value: contract.clientName || "-" },
+        { label: "Client Email", value: contract.clientEmail || "-" },
+        { label: "Client Phone", value: contract.clientPhone || "-" },
+        { label: "Service Type", value: contract.serviceType || "-" },
+        { label: "Project Scope", value: contract.projectScope || "-" },
+        { label: "Effective Date", value: formatDate(contract.effectiveDate) || "-" },
+        { label: "Advance Amount", value: formatAmount(Number(contract.advanceAmount || 0), contract.currencySymbol || "\u20B9") },
+        { label: "Total Amount", value: formatAmount(Number(contract.totalAmount || 0), contract.currencySymbol || "\u20B9") },
+        { label: "Payment Terms", value: contract.paymentTerms || "-" },
+        { label: "Client Signed At", value: formatDate(contract.clientSignedAt) || "-" }
+      ],
+      footerNote:
+        "This is a simplified fallback PDF because the high-fidelity renderer is temporarily unavailable."
+    });
   }
 }

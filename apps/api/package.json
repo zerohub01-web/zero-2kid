@@ -28,6 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.6.1",
     "morgan": "^1.10.0",
+    "pdf-lib": "^1.17.1",
     "puppeteer": "^24.40.0",
     "resend": "^4.8.0",
     "validator": "^13.12.0",

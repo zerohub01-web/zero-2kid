@@ -2,6 +2,8 @@
 import type { Invoice, InvoiceItem } from "../db/schema.js";
 import { formatCurrency } from "./currency.js";
 
+import { generateSimplePdf } from "./simplePdf.js";
+
 export interface InvoiceWithItems extends Omit<Invoice, "items"> {
   id: string;
   items: InvoiceItem[];
@@ -149,20 +151,41 @@ async function launchPdfBrowser() {
 }
 
 export async function generateInvoicePDF(invoice: InvoiceWithItems): Promise<Buffer> {
-  const browser = await launchPdfBrowser();
-
   try {
-    const page = await browser.newPage();
-    await page.setContent(buildInvoiceHTML(invoice), { waitUntil: "networkidle0" });
+    const browser = await launchPdfBrowser();
+    try {
+      const page = await browser.newPage();
+      await page.setContent(buildInvoiceHTML(invoice), { waitUntil: "networkidle0" });
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "0", right: "0", bottom: "0", left: "0" }
+      const pdf = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: { top: "0", right: "0", bottom: "0", left: "0" }
+      });
+
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  } catch (error) {
+    console.error("[PDF] Invoice styled PDF generation failed. Falling back to simplified PDF.", error);
+    return generateSimplePdf({
+      title: "ZERO OPS - Invoice",
+      subtitle: invoice.invoiceNumber || "",
+      rows: [
+        { label: "Invoice Number", value: invoice.invoiceNumber || "-" },
+        { label: "Client Name", value: invoice.clientName || "-" },
+        { label: "Client Email", value: invoice.clientEmail || "-" },
+        { label: "Client Phone", value: invoice.clientPhone || "-" },
+        { label: "Client Business", value: invoice.clientBusiness || "-" },
+        { label: "Due Date", value: new Date(invoice.dueDate).toLocaleDateString("en-IN") },
+        { label: "Subtotal", value: formatCurrency(Number(invoice.subtotal || 0), invoice.currencySymbol || "\u20B9", invoice.currency || "INR") },
+        { label: "Tax", value: `${Number(invoice.gstRate || 0)}%` },
+        { label: "Total Amount", value: formatCurrency(Number(invoice.totalAmount || 0), invoice.currencySymbol || "\u20B9", invoice.currency || "INR") },
+        { label: "Payment Terms", value: invoice.paymentTerms || "-" }
+      ],
+      footerNote:
+        "This is a simplified fallback PDF because the high-fidelity renderer is temporarily unavailable."
     });
-
-    return Buffer.from(pdf);
-  } finally {
-    await browser.close();
   }
 }
