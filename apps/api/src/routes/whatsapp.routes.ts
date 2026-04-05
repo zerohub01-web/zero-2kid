@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  getWhatsAppStatus,
   receiveWhatsAppWebhook,
   sendWhatsAppFromApi,
   verifyWhatsAppWebhook
@@ -13,6 +14,7 @@ export const whatsappRouter = Router();
 
 whatsappRouter.get("/webhook", verifyWhatsAppWebhook);
 whatsappRouter.post("/webhook", whatsappWebhookLimiter, receiveWhatsAppWebhook);
+whatsappRouter.get("/status", requireAuth, requireRole(["SUPER_ADMIN", "MANAGER"]), getWhatsAppStatus);
 
 whatsappRouter.post(
   "/send",

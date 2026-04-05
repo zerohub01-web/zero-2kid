@@ -4,14 +4,36 @@ import { sanitizeMultiline } from "../utils/sanitize.js";
 const PHONE_REGEX = /^\+[1-9]\d{7,14}$/;
 
 export function normalizePhoneE164(phone: string) {
-  const cleaned = phone.trim().replace(/[^\d+]/g, "");
+  const raw = String(phone ?? "").trim();
+  if (!raw) return "";
+
+  const cleaned = raw.replace(/[^\d+]/g, "");
   if (!cleaned) return "";
 
   if (cleaned.startsWith("+")) {
     return `+${cleaned.slice(1).replace(/\+/g, "")}`;
   }
 
-  return `+${cleaned.replace(/\+/g, "")}`;
+  const digitsOnly = cleaned.replace(/\+/g, "");
+  if (!digitsOnly) return "";
+
+  // India default handling:
+  // - 10-digit local mobile: 9746927368 -> +919746927368
+  // - 11-digit with leading zero: 09746927368 -> +919746927368
+  // - 12-digit starting with 91: 919746927368 -> +919746927368
+  if (digitsOnly.length === 10) {
+    return `+91${digitsOnly}`;
+  }
+
+  if (digitsOnly.length === 11 && digitsOnly.startsWith("0")) {
+    return `+91${digitsOnly.slice(1)}`;
+  }
+
+  if (digitsOnly.length === 12 && digitsOnly.startsWith("91")) {
+    return `+${digitsOnly}`;
+  }
+
+  return `+${digitsOnly}`;
 }
 
 export function isValidPhoneE164(phone: string) {

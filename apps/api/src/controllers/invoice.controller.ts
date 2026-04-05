@@ -7,6 +7,7 @@ import { detectCurrency } from "../utils/currency.js";
 import { generateInvoicePDF, type InvoiceWithItems } from "../utils/generateInvoicePDF.js";
 import { buildPortalAccess } from "../utils/portalToken.js";
 import { sendInvoiceEmail, sendInvoiceSignedNotifications } from "../services/invoiceEmail.js";
+import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
 import { buildInvoiceWhatsApp } from "../utils/whatsappMessages.js";
 
 const INVOICE_STORAGE_DIR = path.join(process.cwd(), "storage", "invoices");
@@ -363,6 +364,7 @@ export async function sendInvoice(req: Request, res: Response) {
     const warnings: string[] = [];
     let pdfGenerated = false;
     let emailSent = false;
+    let whatsappSent = false;
     let pdfBuffer: Buffer | undefined;
 
     try {
@@ -400,6 +402,20 @@ export async function sendInvoice(req: Request, res: Response) {
       portalLink: portalAccess.portalLink
     });
     const whatsappUrl = buildWaUrl(invoice.clientPhone, whatsappText);
+    if (whatsappUrl) {
+      try {
+        await sendWhatsAppMessage({
+          phone: invoice.clientPhone,
+          message: whatsappText
+        });
+        whatsappSent = true;
+      } catch (whatsappError) {
+        warnings.push("whatsapp_send_failed");
+        console.error("Send invoice WhatsApp failed:", whatsappError);
+      }
+    } else {
+      warnings.push("whatsapp_phone_missing");
+    }
 
     return res.json({
       success: true,
@@ -407,11 +423,12 @@ export async function sendInvoice(req: Request, res: Response) {
       warnings,
       pdfGenerated,
       emailSent,
+      whatsappSent,
       pdfUrl: invoice.pdfUrl || null,
       portalLink: portalAccess.portalLink,
       status: invoice.status,
       whatsappUrl,
-      message: emailSent
+      message: emailSent || whatsappSent
         ? `Invoice sent to ${invoice.clientEmail}`
         : "Invoice marked as sent. Email delivery failed, use the portal/WhatsApp link."
     });

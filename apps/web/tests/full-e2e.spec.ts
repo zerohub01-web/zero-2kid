@@ -269,7 +269,7 @@ test.describe("Marketing Page", () => {
 
   test("T5.28 - WhatsApp link correct number", async ({ page }) => {
     await page.goto(`${BASE}/services/marketing`);
-    const waLink = page.locator('a[href*="wa.me/918590464379"]');
+    const waLink = page.locator('a[href*="wa.me/919746927368"]');
     expect(await waLink.count()).toBeGreaterThan(0);
   });
 });
@@ -281,14 +281,14 @@ test.describe("WhatsApp CTAs", () => {
     expect(await waLinks.count()).toBeGreaterThanOrEqual(0);
   });
 
-  test("T5.30 - WhatsApp number is correct (918590464379)", async ({ page }) => {
+  test("T5.30 - WhatsApp number is correct (919746927368)", async ({ page }) => {
     await page.goto(BASE);
     const waLinks = page.locator('a[href*="wa.me"]');
     const count = await waLinks.count();
     for (let i = 0; i < count; i += 1) {
       const href = await waLinks.nth(i).getAttribute("href");
       if (href) {
-        expect(href).toContain("918590464379");
+        expect(href).toContain("919746927368");
       }
     }
   });

@@ -29,10 +29,11 @@ import { analyzeLead, resolveProposalPlan } from "../services/leadAutomation.ser
 import { generateProposalForLead } from "../services/proposal.service.js";
 import { CustomerModel } from "../models/Customer.js";
 import { ProjectModel } from "../models/Project.js";
-import { normalizePhoneE164 } from "../services/chat.service.js";
+import { appendOutboundChatMessage, normalizePhoneE164 } from "../services/chat.service.js";
 import { ChatModel } from "../models/Chat.js";
 import { scheduleLeadFollowUps } from "../services/leadFollowUp.service.js";
 import { FollowUpModel } from "../models/FollowUp.js";
+import { sendLeadCreatedWhatsApp } from "../services/whatsapp.service.js";
 
 function getRequestIp(req: Request) {
   const forwarded = req.headers["x-forwarded-for"];
@@ -214,16 +215,24 @@ export async function createBooking(req: Request, res: Response) {
           ipAddress
         }),
         (async () => {
-          console.info("New booking captured. Awaiting client-side WhatsApp ping.", {
+          await sendLeadCreatedWhatsApp({
+            name: booking.name,
+            phone: booking.phone
+          });
+
+          await appendOutboundChatMessage({
+            phone: booking.phone,
+            message: `Hi ${booking.name}, we received your request. We will contact you shortly.`,
+            source: "system"
+          });
+
+          console.info("New booking captured. Day-0 WhatsApp sent automatically.", {
             bookingId: booking.bookingId,
             name: booking.name,
             email: booking.email,
             phone: booking.phone,
             service: booking.service
           });
-          // WhatsApp notification handled client-side via wa.me deep link.
-          // Admin will receive the ping when user clicks the WhatsApp button.
-          // No server-side WhatsApp sending required (free tier).
         })()
       ]);
 

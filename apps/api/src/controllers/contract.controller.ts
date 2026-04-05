@@ -537,6 +537,7 @@ export async function sendContract(req: Request, res: Response) {
     const warnings: string[] = [];
     let pdfGenerated = false;
     let emailSent = false;
+    let whatsappSent = false;
     let pdfBuffer: Buffer | undefined;
 
     try {
@@ -573,6 +574,20 @@ export async function sendContract(req: Request, res: Response) {
       portalLink: portalAccess.portalLink
     });
     const whatsappUrl = buildWaUrl(contract.clientPhone, whatsappText);
+    if (whatsappUrl) {
+      try {
+        await sendWhatsAppMessage({
+          phone: contract.clientPhone,
+          message: whatsappText
+        });
+        whatsappSent = true;
+      } catch (whatsappError) {
+        warnings.push("whatsapp_send_failed");
+        console.error("Send contract WhatsApp failed:", whatsappError);
+      }
+    } else {
+      warnings.push("whatsapp_phone_missing");
+    }
 
     return res.json({
       success: true,
@@ -580,11 +595,12 @@ export async function sendContract(req: Request, res: Response) {
       warnings,
       pdfGenerated,
       emailSent,
+      whatsappSent,
       pdfUrl: contract.pdfUrl || null,
       portalLink: portalAccess.portalLink,
       status: contract.status,
       whatsappUrl,
-      message: emailSent
+      message: emailSent || whatsappSent
         ? `Contract sent to ${contract.clientEmail}`
         : "Contract marked as sent. Email delivery failed, use the portal/WhatsApp link."
     });

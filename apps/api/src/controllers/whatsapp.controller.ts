@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { appendInboundChatMessage, appendOutboundChatMessage } from "../services/chat.service.js";
 import { generateReply } from "../services/whatsappAi.service.js";
-import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
+import { getWhatsAppAutomationStatus, sendWhatsAppMessage } from "../services/whatsapp.service.js";
 import { sanitizeMultiline } from "../utils/sanitize.js";
 import { enqueueWhatsAppJob } from "../services/whatsappQueue.service.js";
 
@@ -136,6 +136,20 @@ export async function sendWhatsAppFromApi(req: Request, res: Response) {
   });
 
   return res.json({ ok: true });
+}
+
+export async function getWhatsAppStatus(_req: Request, res: Response) {
+  try {
+    const status = await getWhatsAppAutomationStatus();
+    return res.json(status);
+  } catch (error) {
+    console.error("WhatsApp status check failed:", error);
+    return res.status(500).json({
+      configured: false,
+      canSend: false,
+      message: "Failed to verify WhatsApp automation status."
+    });
+  }
 }
 
 export async function verifyWhatsAppWebhook(req: Request, res: Response) {

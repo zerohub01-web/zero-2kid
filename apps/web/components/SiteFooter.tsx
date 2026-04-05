@@ -6,7 +6,7 @@ const socials = [
   { name: "Instagram", href: "https://www.instagram.com/_zero_ops_", label: "IG" },
   { name: "Facebook", href: "https://www.facebook.com/karthikeyansp", label: "FB" },
   { name: "LinkedIn", href: "https://linkedin.com/", label: "IN" },
-  { name: "WhatsApp", href: "https://wa.me/918590464379", label: "WA" }
+  { name: "WhatsApp", href: "https://wa.me/919746927368", label: "WA" }
 ];
 
 const quickLinks: { label: string; href: Route }[] = [
@@ -73,7 +73,7 @@ export function SiteFooter() {
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Contact</p>
             <div className="mt-2 text-sm text-[var(--ink)] space-y-1">
               <p>Email: <a className="underline" href="mailto:zerohub01@gmail.com">zerohub01@gmail.com</a></p>
-              <p>Phone: <a className="underline" href="tel:+918590464379">+91 8590464379</a></p>
+              <p>Phone: <a className="underline" href="tel:+919746927368">+91 9746927368</a></p>
             </div>
           </div>
         </div>
