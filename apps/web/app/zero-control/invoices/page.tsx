@@ -21,6 +21,9 @@ interface InvoiceRow {
   dueDate: string;
   createdAt: string;
   viewCount?: number;
+  portalTokens?: {
+    pdf?: string;
+  };
 }
 
 interface InvoiceStats {
@@ -110,8 +113,14 @@ export default function ZeroControlInvoicesPage() {
   const sendInvoice = async (id: string) => {
     setSendingId(id);
     try {
-      await api.post(`/api/invoices/${id}/send`);
-      toast.success("Invoice email sent.");
+      const { data } = await api.post(`/api/invoices/${id}/send`);
+      if (data?.emailSent === false) {
+        toast.error(data?.message || "Invoice marked as sent, but email delivery failed.");
+      } else if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+        toast(data?.message || "Invoice sent with warnings.");
+      } else {
+        toast.success(data?.message || "Invoice email sent.");
+      }
       await fetchData();
     } catch (error) {
       console.error(error);
@@ -236,6 +245,12 @@ export default function ZeroControlInvoicesPage() {
                     </td>
                     <td className="py-3">{new Date(row.dueDate).toLocaleDateString("en-IN")}</td>
                     <td className="py-3">
+                      {(() => {
+                        const pdfToken = row.portalTokens?.pdf || "";
+                        const pdfHref = pdfToken
+                          ? `/api/invoices/${row.id}/pdf?token=${encodeURIComponent(pdfToken)}`
+                          : `/api/invoices/${row.id}/pdf`;
+                        return (
                       <div className="flex flex-wrap gap-2">
                         <Link href={`/zero-control/invoices/${row.id}` as Route} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
                           Edit
@@ -252,15 +267,12 @@ export default function ZeroControlInvoicesPage() {
                           <Mail size={12} />
                           {sendingId === row.id ? "Sending" : "Send"}
                         </button>
-                        <a
-                          href={`/api/invoices/${row.id}/pdf`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs inline-flex items-center gap-1"
-                        >
+                        <a href={pdfHref} target="_blank" rel="noreferrer" className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs inline-flex items-center gap-1">
                           <FileDown size={12} /> PDF
                         </a>
                       </div>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}

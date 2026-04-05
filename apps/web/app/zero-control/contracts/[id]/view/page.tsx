@@ -25,6 +25,9 @@ interface ContractView {
   totalAmount?: number;
   currencySymbol?: string;
   portalLink?: string;
+  portalTokens?: {
+    pdf?: string;
+  };
 }
 
 function isDone(current: ContractView["status"], target: ContractView["status"]): boolean {
@@ -83,8 +86,14 @@ export default function ContractDetailViewPage() {
     if (!contract) return;
     setBusy(true);
     try {
-      await api.post(`/api/contracts/${contract.id}/send`);
-      toast.success("Contract sent again.");
+      const { data } = await api.post(`/api/contracts/${contract.id}/send`);
+      if (data?.emailSent === false) {
+        toast.error(data?.message || "Contract marked as sent, but email delivery failed.");
+      } else if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+        toast(data?.message || "Contract sent with warnings.");
+      } else {
+        toast.success(data?.message || "Contract sent again.");
+      }
       await fetchContract();
     } catch (error) {
       console.error(error);
@@ -120,6 +129,11 @@ export default function ContractDetailViewPage() {
   if (!contract) {
     return <div className="soft-card p-8 text-sm text-[var(--muted)]">Contract not found.</div>;
   }
+
+  const pdfToken = contract.portalTokens?.pdf || "";
+  const pdfHref = pdfToken
+    ? `/api/contracts/${contract.id}/pdf?token=${encodeURIComponent(pdfToken)}`
+    : `/api/contracts/${contract.id}/pdf`;
 
   return (
     <section className="space-y-5">
@@ -178,7 +192,7 @@ export default function ContractDetailViewPage() {
             <Mail size={14} /> Resend Email
           </button>
 
-          <a href={`/api/contracts/${contract.id}/pdf`} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg border border-black/10 bg-white text-sm font-semibold inline-flex items-center gap-2">
+          <a href={pdfHref} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg border border-black/10 bg-white text-sm font-semibold inline-flex items-center gap-2">
             <Download size={14} /> Download PDF
           </a>
 

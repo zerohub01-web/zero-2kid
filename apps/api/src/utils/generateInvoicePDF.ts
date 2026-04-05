@@ -125,13 +125,31 @@ function buildInvoiceHTML(invoice: InvoiceWithItems): string {
 </html>`;
 }
 
-export async function generateInvoicePDF(invoice: InvoiceWithItems): Promise<Buffer> {
+const launchArgs = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] as const;
+
+async function launchPdfBrowser() {
   const executablePath = (process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || "").trim();
-  const browser = await puppeteer.launch({
+
+  if (executablePath) {
+    try {
+      return await puppeteer.launch({
+        headless: true,
+        args: [...launchArgs],
+        executablePath
+      });
+    } catch (error) {
+      console.warn(`[PDF] Failed launching Chrome at "${executablePath}". Retrying with Puppeteer managed browser.`, error);
+    }
+  }
+
+  return puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-    ...(executablePath ? { executablePath } : {})
+    args: [...launchArgs]
   });
+}
+
+export async function generateInvoicePDF(invoice: InvoiceWithItems): Promise<Buffer> {
+  const browser = await launchPdfBrowser();
 
   try {
     const page = await browser.newPage();

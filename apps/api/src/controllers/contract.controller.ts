@@ -685,11 +685,19 @@ export async function downloadContractPdf(req: Request, res: Response) {
       res.setHeader("Content-Disposition", `inline; filename=\"${contract.contractNumber}.pdf\"`);
       return res.send(file);
     } catch {
-      const pdfBuffer = await generateContractPDF(toContractForPdf(contract));
-      await savePdf(String(contract._id), pdfBuffer);
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename=\"${contract.contractNumber}.pdf\"`);
-      return res.send(pdfBuffer);
+      try {
+        const pdfBuffer = await generateContractPDF(toContractForPdf(contract));
+        await savePdf(String(contract._id), pdfBuffer);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename=\"${contract.contractNumber}.pdf\"`);
+        return res.send(pdfBuffer);
+      } catch (generateError) {
+        console.error("Download contract PDF regeneration failed:", generateError);
+        return res.status(503).json({
+          code: "pdf_unavailable",
+          message: "Contract PDF is temporarily unavailable. Please try again shortly."
+        });
+      }
     }
   } catch (error) {
     console.error("Download contract PDF failed:", error);

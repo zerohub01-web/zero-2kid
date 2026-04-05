@@ -51,7 +51,7 @@ async function getWorks(): Promise<WorkItem[]> {
 
 async function getApprovedReviews(): Promise<ReviewCard[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/reviews?status=APPROVED&limit=12`, {
+    const res = await fetch(`${API_BASE}/api/reviews/public?limit=12`, {
       next: { revalidate: 3600 }
     });
     if (!res.ok) return [];

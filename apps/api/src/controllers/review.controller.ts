@@ -10,6 +10,12 @@ function isReviewStatus(value: string): value is ReviewStatus {
   return ["PENDING", "APPROVED", "REJECTED"].includes(value);
 }
 
+function approvedReviewFilter(): Record<string, unknown> {
+  return {
+    $or: [{ status: "APPROVED" }, { status: "approved" }, { approved: true }]
+  };
+}
+
 function getAdminContext(req: Request) {
   const token = req.cookies?.token;
   if (!token) return null;
@@ -26,6 +32,7 @@ function getAdminContext(req: Request) {
 }
 
 function toReviewView(review: ReviewDocument) {
+  const reviewText = review.reviewText || review.testimonial || "";
   return {
     id: String(review._id),
     _id: String(review._id),
@@ -39,8 +46,8 @@ function toReviewView(review: ReviewDocument) {
     clientBusiness: review.clientBusiness ?? "",
     serviceUsed: review.serviceUsed ?? "",
     rating: review.rating,
-    reviewText: review.reviewText,
-    testimonial: review.testimonial,
+    reviewText,
+    testimonial: review.testimonial || reviewText,
     approvedBy: review.approvedBy ?? "",
     rejectedBy: review.rejectedBy ?? "",
     rejectReason: review.rejectReason ?? "",
@@ -153,13 +160,13 @@ export const getReviews = async (req: Request, res: Response) => {
     const limit = Math.max(1, Math.min(200, Number(req.query.limit ?? 12) || 12));
     const admin = getAdminContext(req);
 
-    const where: Record<string, unknown> = {};
+    let where: Record<string, unknown> = {};
     if (admin) {
       if (requestedStatus && isReviewStatus(requestedStatus)) {
         where.status = requestedStatus;
       }
     } else {
-      where.status = "APPROVED";
+      where = approvedReviewFilter();
     }
 
     const reviews = await ReviewModel.find(where)

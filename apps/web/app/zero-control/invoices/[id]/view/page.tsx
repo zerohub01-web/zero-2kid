@@ -27,6 +27,9 @@ interface InvoiceView {
   pdfUrl?: string;
   upiId?: string;
   paymentTerms?: string;
+  portalTokens?: {
+    pdf?: string;
+  };
 }
 
 function statusDone(current: InvoiceView["status"], target: InvoiceView["status"]): boolean {
@@ -74,8 +77,14 @@ export default function InvoiceDetailViewPage() {
     if (!invoice) return;
     setBusy(true);
     try {
-      await api.post(`/api/invoices/${invoice.id}/send`);
-      toast.success("Invoice resent to client.");
+      const { data } = await api.post(`/api/invoices/${invoice.id}/send`);
+      if (data?.emailSent === false) {
+        toast.error(data?.message || "Invoice marked as sent, but email delivery failed.");
+      } else if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+        toast(data?.message || "Invoice sent with warnings.");
+      } else {
+        toast.success(data?.message || "Invoice resent to client.");
+      }
       await fetchInvoice();
     } catch (error) {
       console.error(error);
@@ -111,6 +120,11 @@ export default function InvoiceDetailViewPage() {
   if (!invoice) {
     return <div className="soft-card p-8 text-sm text-[var(--muted)]">Invoice not found.</div>;
   }
+
+  const pdfToken = invoice.portalTokens?.pdf || "";
+  const pdfHref = pdfToken
+    ? `/api/invoices/${invoice.id}/pdf?token=${encodeURIComponent(pdfToken)}`
+    : `/api/invoices/${invoice.id}/pdf`;
 
   return (
     <section className="space-y-5">
@@ -171,7 +185,7 @@ export default function InvoiceDetailViewPage() {
             <Mail size={14} /> Resend Email
           </button>
 
-          <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg border border-black/10 bg-white text-sm font-semibold inline-flex items-center gap-2">
+          <a href={pdfHref} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg border border-black/10 bg-white text-sm font-semibold inline-flex items-center gap-2">
             <Download size={14} /> Download PDF
           </a>
 

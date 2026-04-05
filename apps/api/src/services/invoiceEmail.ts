@@ -5,6 +5,15 @@ import { formatCurrency } from "../utils/currency.js";
 
 const resend = env.resendApiKey ? new Resend(env.resendApiKey) : null;
 
+function getInvoiceFromAddress(): string {
+  return (
+    process.env.INVOICE_EMAIL_FROM ||
+    process.env.CONTRACT_EMAIL_FROM ||
+    env.emailFrom ||
+    "ZeroOps <contracts@zeroops.in>"
+  );
+}
+
 function getWebBase(): string {
   const direct = process.env.NEXT_PUBLIC_WEB_URL ?? process.env.WEB_URL ?? env.clientOrigin;
   return (direct || "http://localhost:3000").replace(/\/$/, "");
@@ -23,7 +32,7 @@ export async function sendInvoiceEmail(
   const total = formatCurrency(invoice.totalAmount, invoice.currencySymbol, invoice.currency);
 
   await resend.emails.send({
-    from: env.emailFrom,
+    from: getInvoiceFromAddress(),
     to: invoice.clientEmail,
     subject: `Invoice ${invoice.invoiceNumber} from ZeroOps - ${total} due`,
     html: `
@@ -84,13 +93,13 @@ export async function sendInvoiceSignedNotifications(invoice: InvoiceWithItems):
 
   await Promise.all([
     resend.emails.send({
-      from: env.emailFrom,
+      from: getInvoiceFromAddress(),
       to: invoice.clientEmail,
       subject: `Invoice ${invoice.invoiceNumber} signed - confirmation`,
       html: sharedHtml
     }),
     resend.emails.send({
-      from: env.emailFrom,
+      from: getInvoiceFromAddress(),
       to: env.adminNotifyEmail,
       subject: `Client signed invoice ${invoice.invoiceNumber}`,
       html: sharedHtml

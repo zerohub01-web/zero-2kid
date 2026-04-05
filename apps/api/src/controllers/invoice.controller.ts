@@ -499,11 +499,19 @@ export async function downloadInvoicePdf(req: Request, res: Response) {
       res.setHeader("Content-Disposition", `inline; filename=\"${invoice.invoiceNumber}.pdf\"`);
       return res.send(file);
     } catch {
-      const pdfBuffer = await generateInvoicePDF(toInvoiceWithItems(invoice));
-      await savePdf(String(invoice._id), pdfBuffer);
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename=\"${invoice.invoiceNumber}.pdf\"`);
-      return res.send(pdfBuffer);
+      try {
+        const pdfBuffer = await generateInvoicePDF(toInvoiceWithItems(invoice));
+        await savePdf(String(invoice._id), pdfBuffer);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename=\"${invoice.invoiceNumber}.pdf\"`);
+        return res.send(pdfBuffer);
+      } catch (generateError) {
+        console.error("Download invoice PDF regeneration failed:", generateError);
+        return res.status(503).json({
+          code: "pdf_unavailable",
+          message: "Invoice PDF is temporarily unavailable. Please try again shortly."
+        });
+      }
     }
   } catch (error) {
     console.error("Download invoice PDF failed:", error);

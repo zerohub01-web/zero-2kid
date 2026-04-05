@@ -18,6 +18,9 @@ interface ContractRow {
   status: ContractStatus;
   createdAt: string;
   viewCount?: number;
+  portalTokens?: {
+    pdf?: string;
+  };
 }
 
 interface ContractStats {
@@ -74,8 +77,14 @@ export default function ZeroControlContractsPage() {
   const sendContract = async (id: string) => {
     setSendingId(id);
     try {
-      await api.post(`/api/contracts/${id}/send`);
-      toast.success("Contract sent to client.");
+      const { data } = await api.post(`/api/contracts/${id}/send`);
+      if (data?.emailSent === false) {
+        toast.error(data?.message || "Contract marked as sent, but email delivery failed.");
+      } else if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+        toast(data?.message || "Contract sent with warnings.");
+      } else {
+        toast.success(data?.message || "Contract sent to client.");
+      }
       await fetchData();
     } catch (error) {
       console.error(error);
@@ -176,6 +185,12 @@ export default function ZeroControlContractsPage() {
                     </td>
                     <td className="py-3">{new Date(row.createdAt).toLocaleDateString("en-IN")}</td>
                     <td className="py-3">
+                      {(() => {
+                        const pdfToken = row.portalTokens?.pdf || "";
+                        const pdfHref = pdfToken
+                          ? `/api/contracts/${row.id}/pdf?token=${encodeURIComponent(pdfToken)}`
+                          : `/api/contracts/${row.id}/pdf`;
+                        return (
                       <div className="flex flex-wrap gap-2">
                         <Link href={`/zero-control/contracts/${row.id}` as Route} className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs">
                           Edit
@@ -187,10 +202,12 @@ export default function ZeroControlContractsPage() {
                           <Mail size={12} />
                           {sendingId === row.id ? "Sending" : "Send"}
                         </button>
-                        <a href={`/api/contracts/${row.id}/pdf`} target="_blank" rel="noreferrer" className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs inline-flex items-center gap-1">
+                        <a href={pdfHref} target="_blank" rel="noreferrer" className="px-2.5 py-1 rounded-md border border-black/10 bg-white text-xs inline-flex items-center gap-1">
                           <FileDown size={12} /> PDF
                         </a>
                       </div>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
