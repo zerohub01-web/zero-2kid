@@ -17,6 +17,22 @@ interface IncomingWhatsAppMessage {
   timestamp: Date;
 }
 
+function resolveHubQueryParam(req: Request, key: string): string {
+  const direct = req.query[key];
+  if (typeof direct === "string" && direct.trim()) {
+    return direct.trim();
+  }
+
+  // express-mongo-sanitize drops dot keys like "hub.mode";
+  // parse from raw URL so Meta webhook verification still works.
+  try {
+    const url = new URL(req.originalUrl || req.url, "http://localhost");
+    return (url.searchParams.get(key) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 function verifyWebhookSignature(req: RequestWithRawBody) {
   if (!env.metaAppSecret) return true;
 
@@ -123,9 +139,9 @@ export async function sendWhatsAppFromApi(req: Request, res: Response) {
 }
 
 export async function verifyWhatsAppWebhook(req: Request, res: Response) {
-  const mode = String(req.query["hub.mode"] ?? "");
-  const verifyToken = String(req.query["hub.verify_token"] ?? "");
-  const challenge = String(req.query["hub.challenge"] ?? "");
+  const mode = resolveHubQueryParam(req, "hub.mode");
+  const verifyToken = resolveHubQueryParam(req, "hub.verify_token");
+  const challenge = resolveHubQueryParam(req, "hub.challenge");
 
   if (mode !== "subscribe" || !env.metaWebhookVerifyToken || verifyToken !== env.metaWebhookVerifyToken) {
     return res.status(403).send("Forbidden");

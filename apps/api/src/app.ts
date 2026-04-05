@@ -13,6 +13,7 @@ import { authRouter } from "./routes/auth.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
 import { getProposalsDirectoryPath } from "./services/proposal.service.js";
 import { whatsappRouter } from "./routes/whatsapp.routes.js";
+import { whatsappWebhookRouter } from "./routes/whatsapp.webhook.js";
 import { invoiceRouter } from "./routes/invoice.routes.js";
 import { contractRouter } from "./routes/contract.routes.js";
 import { proposalRouter } from "./routes/proposal.routes.js";
@@ -115,6 +116,7 @@ app.use("/api/contracts/storage", express.static("storage/contracts"));
 
 app.use("/api", publicRouter);
 app.use("/api/whatsapp", whatsappRouter);
+app.use("/", whatsappWebhookRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/reviews", reviewRoutes);

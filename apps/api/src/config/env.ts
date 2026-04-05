@@ -38,7 +38,7 @@ export const env = {
   openaiModel: cleanEnvValue(process.env.OPENAI_MODEL, "gpt-4o-mini"),
   metaWhatsAppToken: cleanEnvValue(process.env.META_WHATSAPP_TOKEN),
   metaWhatsAppPhoneNumberId: cleanEnvValue(process.env.META_WHATSAPP_PHONE_NUMBER_ID),
-  metaWebhookVerifyToken: cleanEnvValue(process.env.META_WEBHOOK_VERIFY_TOKEN),
+  metaWebhookVerifyToken: cleanEnvValue(process.env.META_WEBHOOK_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN),
   metaAppSecret: cleanEnvValue(process.env.META_APP_SECRET),
   recaptchaSecretKey: cleanEnvValue(process.env.RECAPTCHA_SECRET_KEY),
   recaptchaMinScore: Number(process.env.RECAPTCHA_MIN_SCORE ?? "0.5"),
