@@ -32,6 +32,22 @@ function normalizeBookingKey(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+function normalizeEmailKey(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function resolveBookingMongoId(
+  rawBookingKey: string,
+  bookingMongoIds: Set<string>,
+  bookingMongoIdByPublicId: Map<string, string>
+): string | null {
+  if (!rawBookingKey) return null;
+  if (bookingMongoIds.has(rawBookingKey)) return rawBookingKey;
+  return bookingMongoIdByPublicId.get(rawBookingKey) ?? null;
+}
+
 function pickContractForBooking(
   bookingId: string,
   contractsByBooking: Map<string, PortalContractView>,
@@ -65,20 +81,33 @@ export async function getPortalProject(req: Request, res: Response) {
     }
 
     const bookingIds = bookings.map((booking) => String(booking._id));
+    const bookingMongoIds = new Set(bookingIds);
+    const bookingMongoIdByPublicId = new Map<string, string>();
+    for (const booking of bookings) {
+      const publicBookingId = normalizeBookingKey(booking.bookingId);
+      if (publicBookingId) {
+        bookingMongoIdByPublicId.set(publicBookingId, String(booking._id));
+      }
+    }
+    const bookingLookupKeys = Array.from(
+      new Set([...bookingIds, ...Array.from(bookingMongoIdByPublicId.keys())].filter(Boolean))
+    );
+    const customerEmailKey = normalizeEmailKey(customerEmail);
+
     const [projectRows, contracts, invoices] = await Promise.all([
       ProjectModel.find({ leadId: { $in: bookingIds } }),
       ContractModel.find({
         clientPortalVisible: true,
-        $or: [{ bookingId: { $in: bookingIds } }, { clientEmail: customerEmail }]
+        $or: [{ bookingId: { $in: bookingLookupKeys } }, { clientEmail: customerEmail }]
       })
         .sort({ createdAt: -1 })
-        .select("contractNumber status serviceType createdAt effectiveDate clientSignedAt bookingId"),
+        .select("contractNumber status serviceType createdAt effectiveDate clientSignedAt bookingId clientEmail"),
       InvoiceModel.find({
         clientPortalVisible: true,
-        $or: [{ bookingId: { $in: bookingIds } }, { clientEmail: customerEmail }]
+        $or: [{ bookingId: { $in: bookingLookupKeys } }, { clientEmail: customerEmail }]
       })
         .sort({ createdAt: -1 })
-        .select("invoiceNumber status totalAmount currencySymbol dueDate createdAt bookingId")
+        .select("invoiceNumber status totalAmount currencySymbol dueDate createdAt bookingId clientEmail")
     ]);
 
     const projectByLead = new Map(projectRows.map((row) => [String(row.leadId), row]));
@@ -96,9 +125,14 @@ export async function getPortalProject(req: Request, res: Response) {
         clientSignedAt: contract.clientSignedAt
       };
       const linkedBooking = normalizeBookingKey(contract.bookingId);
-      if (linkedBooking && !contractsByBooking.has(linkedBooking)) {
-        contractsByBooking.set(linkedBooking, formatted);
+      const resolvedBookingId = resolveBookingMongoId(linkedBooking, bookingMongoIds, bookingMongoIdByPublicId);
+      const contractEmailKey = normalizeEmailKey(contract.clientEmail);
+      if (resolvedBookingId && !contractsByBooking.has(resolvedBookingId)) {
+        contractsByBooking.set(resolvedBookingId, formatted);
+      } else if (contractEmailKey === customerEmailKey) {
+        contractsByEmail.push(formatted);
       } else {
+        // Fallback for legacy data where booking/email linkage can be inconsistent.
         contractsByEmail.push(formatted);
       }
     }
@@ -116,9 +150,14 @@ export async function getPortalProject(req: Request, res: Response) {
         createdAt: invoice.createdAt
       };
       const linkedBooking = normalizeBookingKey(invoice.bookingId);
-      if (linkedBooking && !invoicesByBooking.has(linkedBooking)) {
-        invoicesByBooking.set(linkedBooking, formatted);
+      const resolvedBookingId = resolveBookingMongoId(linkedBooking, bookingMongoIds, bookingMongoIdByPublicId);
+      const invoiceEmailKey = normalizeEmailKey(invoice.clientEmail);
+      if (resolvedBookingId && !invoicesByBooking.has(resolvedBookingId)) {
+        invoicesByBooking.set(resolvedBookingId, formatted);
+      } else if (invoiceEmailKey === customerEmailKey) {
+        invoicesByEmail.push(formatted);
       } else {
+        // Fallback for legacy data where booking/email linkage can be inconsistent.
         invoicesByEmail.push(formatted);
       }
     }
