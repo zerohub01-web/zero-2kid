@@ -1,9 +1,11 @@
+import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import * as helmet from "helmet";
 import cookieParser from "cookie-parser";
 import mongoSanitize from "express-mongo-sanitize";
 import morgan from "morgan";
+import mongoose from "mongoose";
 import { env } from "./config/env.js";
 import { publicRouter } from "./routes/public.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
@@ -20,6 +22,16 @@ type RequestWithRawBody = express.Request & { rawBody?: string };
 export const app = express();
 
 app.set("trust proxy", 1);
+
+function isDbUnavailableError(error: unknown) {
+  const message = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);
+  return (
+    message.includes("MongooseServerSelectionError") ||
+    message.includes("buffering timed out") ||
+    message.includes("ECONNREFUSED") ||
+    message.includes("MongoServerSelectionError")
+  );
+}
 
 app.use(helmet.default());
 app.use(
@@ -69,7 +81,32 @@ app.get("/", (_req, res) =>
   })
 );
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+const healthHandler: express.RequestHandler = async (_req, res) => {
+  const timestamp = new Date().toISOString();
+
+  try {
+    if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
+      throw new Error("db-disconnected");
+    }
+
+    await mongoose.connection.db.admin().ping();
+    return res.status(200).json({
+      status: "ok",
+      timestamp,
+      db: "connected"
+    });
+  } catch (error) {
+    return res.status(503).json({
+      status: "degraded",
+      timestamp,
+      db: "disconnected",
+      error: error instanceof Error ? error.message : "db-unavailable"
+    });
+  }
+};
+
+app.get("/health", healthHandler);
+app.get("/api/health", healthHandler);
 
 app.use("/api/proposals", proposalRouter);
 app.use("/api/proposals", express.static(getProposalsDirectoryPath()));
@@ -84,9 +121,17 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/", invoiceRouter);
 app.use("/", contractRouter);
 
-app.use((err: Error & { status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: Error & { status?: number; code?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const isDev = process.env.NODE_ENV !== "production";
+  if (isDbUnavailableError(err)) {
+    return res.status(503).json({
+      code: "db_unavailable",
+      error: "Database connection temporarily unavailable. Please try again."
+    });
+  }
+
   res.status(err.status || 500).json({
+    code: err.code,
     error: isDev ? err.message : "An unexpected error occurred",
     ...(isDev && { stack: err.stack })
   });

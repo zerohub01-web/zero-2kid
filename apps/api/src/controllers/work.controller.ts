@@ -9,8 +9,24 @@ export async function createWork(req: Request, res: Response) {
 }
 
 export async function getWork(_req: Request, res: Response) {
-  const items = await WorkModel.find().sort({ createdAt: -1 });
-  return res.json(items);
+  try {
+    const items = await WorkModel.find().maxTimeMS(5000).sort({ createdAt: -1 });
+    return res.json(items);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("buffering timed out")) {
+      console.error("[DB Timeout] WorkModel.find() failed:", error.message);
+      return res.status(503).json({
+        code: "db_unavailable",
+        error: "Database connection temporarily unavailable. Please try again."
+      });
+    }
+
+    console.error("[Work Error]", error);
+    return res.status(500).json({
+      code: "internal_error",
+      error: "Internal server error"
+    });
+  }
 }
 
 export async function updateWork(req: Request, res: Response) {
@@ -30,6 +46,22 @@ export async function deleteWork(req: Request, res: Response) {
 }
 
 export async function getPublicWorks(_req: Request, res: Response) {
-  const items = await WorkModel.find().select("-__v").sort({ createdAt: -1 });
-  return res.json(items);
+  try {
+    const items = await WorkModel.find().maxTimeMS(5000).select("-__v").sort({ createdAt: -1 });
+    return res.json(items);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("buffering timed out")) {
+      console.error("[DB Timeout] Public WorkModel.find() failed:", error.message);
+      return res.status(503).json({
+        code: "db_unavailable",
+        error: "Database connection temporarily unavailable. Please try again."
+      });
+    }
+
+    console.error("[Public Work Error]", error);
+    return res.status(500).json({
+      code: "internal_error",
+      error: "Internal server error"
+    });
+  }
 }

@@ -346,7 +346,7 @@ export default function HomePage() {
         >
           <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_5px_rgba(16,185,129,0.16)] transition group-hover:shadow-[0_0_0_7px_rgba(16,185,129,0.2)]" />
           <span className="text-center leading-none">
-            Official Email Partner
+            Official Email Partner · Resend
           </span>
           <span className="inline-flex items-center rounded-lg border border-slate-900/15 bg-white px-3.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
             <img src="/resend-logo.svg" alt="Resend official logo" className="block h-4 w-auto" />

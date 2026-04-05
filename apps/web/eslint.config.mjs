@@ -1,5 +1,6 @@
 import globals from "globals";
 import tseslint from "typescript-eslint";
+import nextPlugin from "@next/eslint-plugin-next";
 
 export default [
   {
@@ -13,6 +14,10 @@ export default [
   },
   {
     files: ["**/*.{ts,tsx,js,jsx}"],
+    plugins: {
+      "@typescript-eslint": tseslint.plugin,
+      "@next/next": nextPlugin
+    },
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
@@ -25,6 +30,10 @@ export default [
         ...globals.node
       }
     },
-    rules: {}
+    rules: {
+      "@next/next/no-img-element": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }]
+    }
   }
 ];

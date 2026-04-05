@@ -9,13 +9,45 @@ export async function createService(req: Request, res: Response) {
 }
 
 export async function getServices(_req: Request, res: Response) {
-  const services = await ServiceModel.find().sort({ createdAt: -1 });
-  return res.json(services);
+  try {
+    const services = await ServiceModel.find().maxTimeMS(5000).sort({ createdAt: -1 });
+    return res.json(services);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("buffering timed out")) {
+      console.error("[DB Timeout] ServiceModel.find() failed:", error.message);
+      return res.status(503).json({
+        code: "db_unavailable",
+        error: "Database connection temporarily unavailable. Please try again."
+      });
+    }
+
+    console.error("[Services Error]", error);
+    return res.status(500).json({
+      code: "internal_error",
+      error: "Internal server error"
+    });
+  }
 }
 
 export async function getPublicServices(_req: Request, res: Response) {
-  const services = await ServiceModel.find({ isActive: true }).sort({ createdAt: -1 });
-  return res.json(services);
+  try {
+    const services = await ServiceModel.find({ isActive: true }).maxTimeMS(5000).sort({ createdAt: -1 });
+    return res.json(services);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("buffering timed out")) {
+      console.error("[DB Timeout] Public ServiceModel.find() failed:", error.message);
+      return res.status(503).json({
+        code: "db_unavailable",
+        error: "Database connection temporarily unavailable. Please try again."
+      });
+    }
+
+    console.error("[Public Services Error]", error);
+    return res.status(500).json({
+      code: "internal_error",
+      error: "Internal server error"
+    });
+  }
 }
 
 export async function updateService(req: Request, res: Response) {

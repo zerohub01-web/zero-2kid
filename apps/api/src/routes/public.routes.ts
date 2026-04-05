@@ -30,6 +30,20 @@ publicRouter.get("/calls/slots", validate(callSlotsQuerySchema), getAvailableCal
 publicRouter.post("/calls/book", bookingLimiter, validate(createCallBookingSchema), createCallBooking);
 publicRouter.get("/portal/project", requireCustomerAuth, getPortalProject);
 publicRouter.get("/projects", requireCustomerAuth, async (_req, res) => {
-  const items = await WorkModel.find().select("-__v").sort({ createdAt: -1 });
-  return res.json({ projects: items });
+  try {
+    const items = await WorkModel.find().maxTimeMS(5000).select("-__v").sort({ createdAt: -1 });
+    return res.json({ projects: items });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("buffering timed out")) {
+      return res.status(503).json({
+        code: "db_unavailable",
+        error: "Database connection temporarily unavailable. Please try again."
+      });
+    }
+
+    return res.status(500).json({
+      code: "internal_error",
+      error: "Internal server error"
+    });
+  }
 });
