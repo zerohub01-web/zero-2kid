@@ -501,7 +501,11 @@ export async function downloadInvoicePdf(req: Request, res: Response) {
     } catch {
       try {
         const pdfBuffer = await generateInvoicePDF(toInvoiceWithItems(invoice));
-        await savePdf(String(invoice._id), pdfBuffer);
+        try {
+          await savePdf(String(invoice._id), pdfBuffer);
+        } catch (saveError) {
+          console.warn("Download invoice PDF cache save failed, returning generated PDF directly:", saveError);
+        }
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `inline; filename=\"${invoice.invoiceNumber}.pdf\"`);
         return res.send(pdfBuffer);

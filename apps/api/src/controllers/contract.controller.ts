@@ -687,7 +687,11 @@ export async function downloadContractPdf(req: Request, res: Response) {
     } catch {
       try {
         const pdfBuffer = await generateContractPDF(toContractForPdf(contract));
-        await savePdf(String(contract._id), pdfBuffer);
+        try {
+          await savePdf(String(contract._id), pdfBuffer);
+        } catch (saveError) {
+          console.warn("Download contract PDF cache save failed, returning generated PDF directly:", saveError);
+        }
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `inline; filename=\"${contract.contractNumber}.pdf\"`);
         return res.send(pdfBuffer);
