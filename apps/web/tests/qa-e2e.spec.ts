@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const BASE = process.env.WEB_URL || "http://localhost:3000";
+const BASE = process.env.WEB_URL || "http://127.0.0.1:3000";
 
 const bookingPayload = {
   name: "QA Web User",

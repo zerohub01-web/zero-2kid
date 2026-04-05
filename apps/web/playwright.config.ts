@@ -13,10 +13,18 @@ export default defineConfig({
     ["html", { outputFolder: "test-results/html", open: "never" }]
   ],
   use: {
-    baseURL: process.env.WEB_URL || "http://localhost:3000",
+    baseURL: process.env.WEB_URL || "http://127.0.0.1:3000",
     screenshot: "only-on-failure",
     video: "on-first-retry",
     trace: "on-first-retry"
+  },
+  webServer: {
+    command: "npm run dev",
+    url: process.env.WEB_URL || "http://127.0.0.1:3000",
+    reuseExistingServer: !process.env.CI,
+    timeout: 180000,
+    stdout: "pipe",
+    stderr: "pipe"
   },
   projects: [
     {

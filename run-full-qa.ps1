@@ -1,6 +1,9 @@
 $ErrorActionPreference = "Continue"
 
-$root = "C:\Users\karth\OneDrive\Desktop\karthi\zero\zero 2kid"
+$root = $PSScriptRoot
+if (-not $root) {
+  $root = (Get-Location).Path
+}
 $webDir = Join-Path $root "apps\web"
 $apiDir = Join-Path $root "apps\api"
 $reportDir = Join-Path $root "test-results"
