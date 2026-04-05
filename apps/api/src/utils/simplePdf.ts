@@ -23,8 +23,15 @@ function safe(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+function toWinAnsiSafe(value: unknown): string {
+  return safe(value)
+    .replace(/\u20B9/g, "INR ")
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E\n\r\t]/g, "");
+}
+
 function wrapText(text: string, maxWidth: number, fontSize: number, font: PDFFont) {
-  const words = safe(text).split(/\s+/).filter(Boolean);
+  const words = toWinAnsiSafe(text).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [""];
 
   const lines: string[] = [];
@@ -60,7 +67,7 @@ export async function generateSimplePdf({ title, subtitle, rows, footerNote }: S
     }
   };
 
-  page.drawText(safe(title), {
+  page.drawText(toWinAnsiSafe(title), {
     x: MARGIN_X,
     y,
     size: TITLE_SIZE,
@@ -70,7 +77,7 @@ export async function generateSimplePdf({ title, subtitle, rows, footerNote }: S
   y -= TITLE_SIZE + 8;
 
   if (subtitle) {
-    page.drawText(safe(subtitle), {
+    page.drawText(toWinAnsiSafe(subtitle), {
       x: MARGIN_X,
       y,
       size: SUBTITLE_SIZE,
@@ -89,8 +96,8 @@ export async function generateSimplePdf({ title, subtitle, rows, footerNote }: S
   y -= 16;
 
   for (const row of rows) {
-    const label = `${safe(row.label)}:`;
-    const value = safe(row.value) || "-";
+    const label = `${toWinAnsiSafe(row.label)}:`;
+    const value = toWinAnsiSafe(row.value) || "-";
     const labelWidth = Math.min(160, contentWidth * 0.34);
     const valueX = MARGIN_X + labelWidth + 10;
     const valueWidth = contentWidth - labelWidth - 10;
@@ -127,7 +134,7 @@ export async function generateSimplePdf({ title, subtitle, rows, footerNote }: S
   }
 
   const finalFooter =
-    safe(footerNote) ||
+    toWinAnsiSafe(footerNote) ||
     "Auto-generated fallback PDF copy. Please contact ZERO OPS support if you need the styled PDF version.";
 
   ensureSpace(FOOTER_SIZE + 8);
