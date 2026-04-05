@@ -3,6 +3,7 @@ import type { Invoice, InvoiceItem } from "../db/schema.js";
 import { formatCurrency } from "./currency.js";
 
 import { generateSimplePdf } from "./simplePdf.js";
+import { generateEmergencyPdf } from "./emergencyPdf.js";
 
 export interface InvoiceWithItems extends Omit<Invoice, "items"> {
   id: string;
@@ -169,23 +170,37 @@ export async function generateInvoicePDF(invoice: InvoiceWithItems): Promise<Buf
     }
   } catch (error) {
     console.error("[PDF] Invoice styled PDF generation failed. Falling back to simplified PDF.", error);
-    return generateSimplePdf({
-      title: "ZERO OPS - Invoice",
-      subtitle: invoice.invoiceNumber || "",
-      rows: [
-        { label: "Invoice Number", value: invoice.invoiceNumber || "-" },
-        { label: "Client Name", value: invoice.clientName || "-" },
-        { label: "Client Email", value: invoice.clientEmail || "-" },
-        { label: "Client Phone", value: invoice.clientPhone || "-" },
-        { label: "Client Business", value: invoice.clientBusiness || "-" },
-        { label: "Due Date", value: new Date(invoice.dueDate).toLocaleDateString("en-IN") },
-        { label: "Subtotal", value: formatCurrency(Number(invoice.subtotal || 0), invoice.currencySymbol || "\u20B9", invoice.currency || "INR") },
-        { label: "Tax", value: `${Number(invoice.gstRate || 0)}%` },
-        { label: "Total Amount", value: formatCurrency(Number(invoice.totalAmount || 0), invoice.currencySymbol || "\u20B9", invoice.currency || "INR") },
-        { label: "Payment Terms", value: invoice.paymentTerms || "-" }
-      ],
-      footerNote:
-        "This is a simplified fallback PDF because the high-fidelity renderer is temporarily unavailable."
-    });
+    try {
+      return await generateSimplePdf({
+        title: "ZERO OPS - Invoice",
+        subtitle: invoice.invoiceNumber || "",
+        rows: [
+          { label: "Invoice Number", value: invoice.invoiceNumber || "-" },
+          { label: "Client Name", value: invoice.clientName || "-" },
+          { label: "Client Email", value: invoice.clientEmail || "-" },
+          { label: "Client Phone", value: invoice.clientPhone || "-" },
+          { label: "Client Business", value: invoice.clientBusiness || "-" },
+          { label: "Due Date", value: new Date(invoice.dueDate).toLocaleDateString("en-IN") },
+          { label: "Subtotal", value: formatCurrency(Number(invoice.subtotal || 0), invoice.currencySymbol || "\u20B9", invoice.currency || "INR") },
+          { label: "Tax", value: `${Number(invoice.gstRate || 0)}%` },
+          { label: "Total Amount", value: formatCurrency(Number(invoice.totalAmount || 0), invoice.currencySymbol || "\u20B9", invoice.currency || "INR") },
+          { label: "Payment Terms", value: invoice.paymentTerms || "-" }
+        ],
+        footerNote:
+          "This is a simplified fallback PDF because the high-fidelity renderer is temporarily unavailable."
+      });
+    } catch (fallbackError) {
+      console.error("[PDF] Invoice simplified fallback failed. Using emergency PDF.", fallbackError);
+      return generateEmergencyPdf("ZERO OPS - Invoice", [
+        `Invoice Number: ${invoice.invoiceNumber || "-"}`,
+        `Client Name: ${invoice.clientName || "-"}`,
+        `Client Email: ${invoice.clientEmail || "-"}`,
+        `Client Phone: ${invoice.clientPhone || "-"}`,
+        `Client Business: ${invoice.clientBusiness || "-"}`,
+        `Due Date: ${new Date(invoice.dueDate).toLocaleDateString("en-IN")}`,
+        `Total Amount: ${formatCurrency(Number(invoice.totalAmount || 0), invoice.currencySymbol || "\u20B9", invoice.currency || "INR")}`,
+        `Payment Terms: ${invoice.paymentTerms || "-"}`
+      ]);
+    }
   }
 }

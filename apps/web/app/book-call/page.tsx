@@ -82,7 +82,7 @@ export default function BookCallPage() {
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [booking, setBooking] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState("");
-  const [form, setForm] = useState({ name: "", email: "" });
+  const [form, setForm] = useState({ name: "", phone: "" });
   const [success, setSuccess] = useState("");
   const [slotNotice, setSlotNotice] = useState("");
 
@@ -153,6 +153,10 @@ export default function BookCallPage() {
       toast.error("Please enter your full name.");
       return;
     }
+    if (form.phone.replace(/[^\d]/g, "").length < 7) {
+      toast.error("Please enter a valid mobile number.");
+      return;
+    }
 
     setBooking(true);
     setSuccess("");
@@ -163,7 +167,7 @@ export default function BookCallPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name.trim(),
-          email: form.email.trim(),
+          phone: form.phone.trim(),
           timeSlot: selectedSlot
         })
       });
@@ -195,7 +199,7 @@ export default function BookCallPage() {
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Auto Call Scheduler</p>
         <h1 className="text-5xl md:text-6xl font-display text-[var(--ink)] mt-3">Book your strategy call.</h1>
         <p className="text-sm md:text-base text-[var(--muted)] mt-4 max-w-2xl">
-          Choose a live slot, avoid double bookings automatically, and receive email reminders before the call.
+          Choose a live slot, avoid double bookings automatically, and share your mobile number for reminders.
         </p>
 
         <div className="soft-card p-6 md:p-8 mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -249,7 +253,7 @@ export default function BookCallPage() {
               ) : (
                 <div className="rounded-xl border border-black/10 bg-white/70 px-4 py-3 text-sm text-[var(--muted)]">
                   No slots available for this date. Try another date or contact us on{" "}
-                  <a href="https://wa.me/918590464379" className="underline font-semibold">
+                  <a href="https://wa.me/919746927368" className="underline font-semibold">
                     WhatsApp
                   </a>
                   .
@@ -273,10 +277,9 @@ export default function BookCallPage() {
             />
             <input
               required
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((previous) => ({ ...previous, email: event.target.value }))}
-              placeholder="Email"
+              value={form.phone}
+              onChange={(event) => setForm((previous) => ({ ...previous, phone: event.target.value }))}
+              placeholder="Mobile number"
               className="field py-3"
             />
 

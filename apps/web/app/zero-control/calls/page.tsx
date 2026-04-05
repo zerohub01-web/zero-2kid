@@ -11,6 +11,7 @@ interface CallBooking {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   timeSlot: string;
   status: CallStatus;
   reminderSentAt?: string | null;
@@ -46,8 +47,19 @@ function buildReminderMessage(call: CallBooking) {
   return `Hi ${call.name}, just a reminder about your call with ZERO OPS scheduled for ${prettyDate}. Looking forward to speaking with you! \u2014 ZERO OPS Team`;
 }
 
-function buildWhatsAppLink(message: string) {
-  return `https://wa.me/?text=${encodeURIComponent(message)}`;
+function displayCallEmail(email: string): string {
+  if (/^call-\d+@zeroops\.in$/i.test(String(email ?? "").trim())) {
+    return "No email provided";
+  }
+  return email || "No email provided";
+}
+
+function buildWhatsAppLink(phone: string | undefined, message: string) {
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  if (!digits) {
+    return `https://wa.me/?text=${encodeURIComponent(message)}`;
+  }
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
 export default function CallBookingsPage() {
@@ -187,7 +199,8 @@ export default function CallBookingsPage() {
                     <tr key={row.id}>
                       <td className="py-3">
                         <p className="font-medium">{row.name}</p>
-                        <p className="text-xs text-[var(--muted)]">{row.email}</p>
+                        <p className="text-xs text-[var(--muted)]">{displayCallEmail(row.email)}</p>
+                        <p className="text-xs text-[var(--muted)]">{row.phone || "No mobile number"}</p>
                       </td>
                       <td className="py-3">{formatDateTime(row.timeSlot)}</td>
                       <td className="py-3">Strategy / Discovery Call</td>
@@ -225,7 +238,7 @@ export default function CallBookingsPage() {
                             Cancel
                           </button>
                           <a
-                            href={buildWhatsAppLink(buildReminderMessage(row))}
+                            href={buildWhatsAppLink(row.phone, buildReminderMessage(row))}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-black/10 bg-white text-xs font-semibold"

@@ -1,6 +1,7 @@
 import puppeteer from "puppeteer";
 import type { Contract } from "../db/schema.js";
 import { generateSimplePdf } from "./simplePdf.js";
+import { generateEmergencyPdf } from "./emergencyPdf.js";
 
 export type ContractForPdf = Omit<Contract, "createdAt" | "updatedAt"> & {
   id: string;
@@ -698,24 +699,38 @@ export async function generateContractPDF(contract: ContractForPdf): Promise<Buf
     }
   } catch (error) {
     console.error("[PDF] Contract styled PDF generation failed. Falling back to simplified PDF.", error);
-    return generateSimplePdf({
-      title: "ZERO OPS - Service Agreement",
-      subtitle: contract.contractNumber || "",
-      rows: [
-        { label: "Contract Number", value: contract.contractNumber || "-" },
-        { label: "Client Name", value: contract.clientName || "-" },
-        { label: "Client Email", value: contract.clientEmail || "-" },
-        { label: "Client Phone", value: contract.clientPhone || "-" },
-        { label: "Service Type", value: contract.serviceType || "-" },
-        { label: "Project Scope", value: contract.projectScope || "-" },
-        { label: "Effective Date", value: formatDate(contract.effectiveDate) || "-" },
-        { label: "Advance Amount", value: formatAmount(Number(contract.advanceAmount || 0), contract.currencySymbol || "\u20B9") },
-        { label: "Total Amount", value: formatAmount(Number(contract.totalAmount || 0), contract.currencySymbol || "\u20B9") },
-        { label: "Payment Terms", value: contract.paymentTerms || "-" },
-        { label: "Client Signed At", value: formatDate(contract.clientSignedAt) || "-" }
-      ],
-      footerNote:
-        "This is a simplified fallback PDF because the high-fidelity renderer is temporarily unavailable."
-    });
+    try {
+      return await generateSimplePdf({
+        title: "ZERO OPS - Service Agreement",
+        subtitle: contract.contractNumber || "",
+        rows: [
+          { label: "Contract Number", value: contract.contractNumber || "-" },
+          { label: "Client Name", value: contract.clientName || "-" },
+          { label: "Client Email", value: contract.clientEmail || "-" },
+          { label: "Client Phone", value: contract.clientPhone || "-" },
+          { label: "Service Type", value: contract.serviceType || "-" },
+          { label: "Project Scope", value: contract.projectScope || "-" },
+          { label: "Effective Date", value: formatDate(contract.effectiveDate) || "-" },
+          { label: "Advance Amount", value: formatAmount(Number(contract.advanceAmount || 0), contract.currencySymbol || "\u20B9") },
+          { label: "Total Amount", value: formatAmount(Number(contract.totalAmount || 0), contract.currencySymbol || "\u20B9") },
+          { label: "Payment Terms", value: contract.paymentTerms || "-" },
+          { label: "Client Signed At", value: formatDate(contract.clientSignedAt) || "-" }
+        ],
+        footerNote:
+          "This is a simplified fallback PDF because the high-fidelity renderer is temporarily unavailable."
+      });
+    } catch (fallbackError) {
+      console.error("[PDF] Contract simplified fallback failed. Using emergency PDF.", fallbackError);
+      return generateEmergencyPdf("ZERO OPS - Service Agreement", [
+        `Contract Number: ${contract.contractNumber || "-"}`,
+        `Client Name: ${contract.clientName || "-"}`,
+        `Client Email: ${contract.clientEmail || "-"}`,
+        `Client Phone: ${contract.clientPhone || "-"}`,
+        `Service Type: ${contract.serviceType || "-"}`,
+        `Effective Date: ${formatDate(contract.effectiveDate) || "-"}`,
+        `Total Amount: ${formatAmount(Number(contract.totalAmount || 0), contract.currencySymbol || "\u20B9")}`,
+        `Payment Terms: ${contract.paymentTerms || "-"}`
+      ]);
+    }
   }
 }

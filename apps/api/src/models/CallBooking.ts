@@ -5,6 +5,7 @@ export type CallStatus = "booked" | "confirmed" | "completed" | "cancelled";
 export interface CallBookingDocument extends mongoose.Document {
   name: string;
   email: string;
+  phone: string;
   timeSlot: Date;
   status: CallStatus;
   reminderSentAt: Date | null;
@@ -16,6 +17,7 @@ const callBookingSchema = new Schema<CallBookingDocument>(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true, index: true },
+    phone: { type: String, required: true, trim: true },
     timeSlot: { type: Date, required: true },
     status: {
       type: String,

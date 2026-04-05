@@ -25,8 +25,27 @@ function sanitizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function sanitizePhone(value: string): string {
+  const cleaned = value.replace(/[^\d+]/g, "").trim();
+  if (!cleaned) return "";
+  if (cleaned.startsWith("+")) {
+    return `+${cleaned.slice(1).replace(/\+/g, "")}`.slice(0, 20);
+  }
+  return cleaned.replace(/\+/g, "").slice(0, 20);
+}
+
+function buildFallbackEmailFromPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits) return `call-${digits}@zeroops.in`;
+  return `call-${Date.now()}@zeroops.in`;
+}
+
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isValidPhone(value: string): boolean {
+  return value.replace(/\D/g, "").length >= 7;
 }
 
 function cleanApiBase(value: unknown): string {
@@ -127,17 +146,24 @@ async function saveFallbackCall(payload: UnknownRecord): Promise<void> {
 
 export async function POST(req: NextRequest) {
   const body = toRecord(await req.json().catch(() => ({})));
+  const sanitizedPhone = sanitizePhone(asString(body.phone));
+  const sanitizedEmail = sanitizeEmail(asString(body.email));
+  const normalizedEmail = isValidEmail(sanitizedEmail)
+    ? sanitizedEmail
+    : buildFallbackEmailFromPhone(sanitizedPhone);
+
   const normalized: UnknownRecord = {
     name: sanitizeSingleLine(asString(body.name), 80),
-    email: sanitizeEmail(asString(body.email)),
+    email: normalizedEmail,
+    phone: sanitizedPhone,
     timeSlot: asString(body.timeSlot)
   };
 
   if (asString(normalized.name).length < 2) {
     return NextResponse.json({ message: "Name must be at least 2 characters." }, { status: 422 });
   }
-  if (!isValidEmail(asString(normalized.email))) {
-    return NextResponse.json({ message: "Please enter a valid email address." }, { status: 422 });
+  if (!isValidPhone(asString(normalized.phone))) {
+    return NextResponse.json({ message: "Please enter a valid mobile number." }, { status: 422 });
   }
   if (!asString(normalized.timeSlot)) {
     return NextResponse.json({ message: "Please select a timeslot." }, { status: 422 });
