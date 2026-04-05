@@ -11,12 +11,12 @@ function getWebBase(): string {
 
 export async function sendContractEmail(
   contract: ContractForPdf,
-  pdfBuffer: Buffer,
+  pdfBuffer?: Buffer,
   portalLink = `${getWebBase()}/portal/contract/${contract.id}`
-): Promise<void> {
+): Promise<boolean> {
   if (!resend) {
     console.warn("RESEND_API_KEY missing: skipping contract email send.");
-    return;
+    return false;
   }
 
   await resend.emails.send({
@@ -83,7 +83,11 @@ export async function sendContractEmail(
               Review and Sign Agreement ->
             </a>
             <p style="font-size:11px;color:#aaa;margin:10px 0 0">
-              The PDF is also attached for your records.
+              ${
+                pdfBuffer
+                  ? "The PDF is also attached for your records."
+                  : "You can access the latest agreement from the review link above."
+              }
             </p>
           </div>
 
@@ -100,19 +104,25 @@ export async function sendContractEmail(
         </div>
       </div>
     `,
-    attachments: [
-      {
-        filename: `${contract.contractNumber}.pdf`,
-        content: pdfBuffer.toString("base64")
-      }
-    ]
+    ...(pdfBuffer
+      ? {
+          attachments: [
+            {
+              filename: `${contract.contractNumber}.pdf`,
+              content: pdfBuffer.toString("base64")
+            }
+          ]
+        }
+      : {})
   });
+
+  return true;
 }
 
-export async function sendContractSignedNotifications(contract: ContractForPdf, pdfBuffer: Buffer): Promise<void> {
+export async function sendContractSignedNotifications(contract: ContractForPdf, pdfBuffer?: Buffer): Promise<boolean> {
   if (!resend) {
     console.warn("RESEND_API_KEY missing: skipping signed contract notifications.");
-    return;
+    return false;
   }
 
   const signedAt = contract.clientSignedAt ? new Date(contract.clientSignedAt).toLocaleString("en-IN") : new Date().toLocaleString("en-IN");
@@ -139,24 +149,34 @@ export async function sendContractSignedNotifications(contract: ContractForPdf, 
       to: contract.clientEmail,
       subject: `Signed Agreement Copy - ${contract.contractNumber}`,
       html: clientHtml,
-      attachments: [
-        {
-          filename: `${contract.contractNumber}-signed.pdf`,
-          content: pdfBuffer.toString("base64")
-        }
-      ]
+      ...(pdfBuffer
+        ? {
+            attachments: [
+              {
+                filename: `${contract.contractNumber}-signed.pdf`,
+                content: pdfBuffer.toString("base64")
+              }
+            ]
+          }
+        : {})
     }),
     resend.emails.send({
       from: process.env.CONTRACT_EMAIL_FROM || "ZeroOps <contracts@zeroops.in>",
       to: env.adminNotifyEmail,
       subject: `Client signed contract ${contract.contractNumber}`,
       html: adminHtml,
-      attachments: [
-        {
-          filename: `${contract.contractNumber}-signed.pdf`,
-          content: pdfBuffer.toString("base64")
-        }
-      ]
+      ...(pdfBuffer
+        ? {
+            attachments: [
+              {
+                filename: `${contract.contractNumber}-signed.pdf`,
+                content: pdfBuffer.toString("base64")
+              }
+            ]
+          }
+        : {})
     })
   ]);
+
+  return true;
 }

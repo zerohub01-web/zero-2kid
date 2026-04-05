@@ -534,14 +534,34 @@ export async function sendContract(req: Request, res: Response) {
     contract.emailSentAt = new Date();
     await contract.save();
 
-    const pdfBuffer = await generateContractPDF(toContractForPdf(contract));
-    const pdfUrl = await savePdf(String(contract._id), pdfBuffer);
+    const warnings: string[] = [];
+    let pdfGenerated = false;
+    let emailSent = false;
+    let pdfBuffer: Buffer | undefined;
 
-    contract.pdfUrl = pdfUrl;
-    await contract.save();
+    try {
+      pdfBuffer = await generateContractPDF(toContractForPdf(contract));
+      const pdfUrl = await savePdf(String(contract._id), pdfBuffer);
+      contract.pdfUrl = pdfUrl;
+      await contract.save();
+      pdfGenerated = true;
+    } catch (pdfError) {
+      warnings.push("pdf_generation_failed");
+      console.error("Send contract PDF generation failed:", pdfError);
+    }
+
     const portalAccess = buildPortalAccess("contract", String(contract._id), getWebBase());
 
-    await sendContractEmail(toContractForPdf(contract), pdfBuffer, portalAccess.portalLink);
+    try {
+      emailSent = await sendContractEmail(toContractForPdf(contract), pdfBuffer, portalAccess.portalLink);
+      if (!emailSent) {
+        warnings.push("email_not_configured");
+      }
+    } catch (emailError) {
+      warnings.push("email_send_failed");
+      console.error("Send contract email failed:", emailError);
+    }
+
     const whatsappText = buildContractWhatsApp({
       id: String(contract._id),
       clientName: contract.clientName,
@@ -556,15 +576,24 @@ export async function sendContract(req: Request, res: Response) {
 
     return res.json({
       success: true,
-      pdfUrl: contract.pdfUrl,
+      code: warnings.length > 0 ? "contract_sent_with_warnings" : "contract_sent",
+      warnings,
+      pdfGenerated,
+      emailSent,
+      pdfUrl: contract.pdfUrl || null,
       portalLink: portalAccess.portalLink,
       status: contract.status,
       whatsappUrl,
-      message: `Contract sent to ${contract.clientEmail}`
+      message: emailSent
+        ? `Contract sent to ${contract.clientEmail}`
+        : "Contract marked as sent. Email delivery failed, use the portal/WhatsApp link."
     });
   } catch (error) {
     console.error("Send contract failed:", error);
-    return res.status(500).json({ message: "Failed to send contract" });
+    return res.status(500).json({
+      code: "contract_send_failed",
+      message: "Failed to send contract"
+    });
   }
 }
 
@@ -584,28 +613,61 @@ export async function signContract(req: Request, res: Response) {
     contract.clientSignedAt = req.body?.agreedAt ? new Date(req.body.agreedAt) : new Date();
     contract.clientSignedIP = getRequestIp(req);
     contract.status = "SIGNED";
-
-    const pdfBuffer = await generateContractPDF(toContractForPdf(contract));
-    const pdfUrl = await savePdf(String(contract._id), pdfBuffer);
-    contract.pdfUrl = pdfUrl;
-
     await contract.save();
 
-    await sendContractSignedNotifications(toContractForPdf(contract), pdfBuffer);
-    await sendAdminSignedWhatsApp(contract);
+    const warnings: string[] = [];
+    let pdfGenerated = false;
+    let notificationsSent = false;
+    let pdfBuffer: Buffer | undefined;
+
+    try {
+      pdfBuffer = await generateContractPDF(toContractForPdf(contract));
+      const pdfUrl = await savePdf(String(contract._id), pdfBuffer);
+      contract.pdfUrl = pdfUrl;
+      await contract.save();
+      pdfGenerated = true;
+    } catch (pdfError) {
+      warnings.push("pdf_generation_failed");
+      console.error("Sign contract PDF generation failed:", pdfError);
+    }
+
+    try {
+      notificationsSent = await sendContractSignedNotifications(toContractForPdf(contract), pdfBuffer);
+      if (!notificationsSent) {
+        warnings.push("notification_email_not_configured");
+      }
+    } catch (notificationError) {
+      warnings.push("notification_email_failed");
+      console.error("Sign contract notification email failed:", notificationError);
+    }
+
+    try {
+      await sendAdminSignedWhatsApp(contract);
+    } catch (whatsAppError) {
+      warnings.push("notification_whatsapp_failed");
+      console.error("Sign contract admin WhatsApp failed:", whatsAppError);
+    }
+
     const adminWhatsappAlert = buildAdminSignedWhatsappUrl(contract);
 
     return res.json({
       success: true,
+      code: warnings.length > 0 ? "contract_signed_with_warnings" : "contract_signed",
+      warnings,
+      pdfGenerated,
+      notificationsSent,
       signedAt: contract.clientSignedAt,
       status: contract.status,
-      pdfUrl: contract.pdfUrl,
+      pdfUrl: contract.pdfUrl || null,
       message: "Contract signed successfully",
       adminWhatsappAlert
     });
   } catch (error) {
     console.error("Sign contract failed:", error);
-    return res.status(500).json({ message: "Failed to sign contract" });
+    return res.status(500).json({
+      code: "contract_sign_failed",
+      message: "Failed to sign contract"
+    });
   }
 }
 

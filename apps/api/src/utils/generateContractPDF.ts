@@ -653,9 +653,11 @@ export function buildContractHTML(contract: ContractForPdf): string {
 }
 
 export async function generateContractPDF(contract: ContractForPdf): Promise<Buffer> {
+  const executablePath = (process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || "").trim();
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    ...(executablePath ? { executablePath } : {})
   });
 
   try {

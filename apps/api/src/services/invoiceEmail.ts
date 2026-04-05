@@ -12,12 +12,12 @@ function getWebBase(): string {
 
 export async function sendInvoiceEmail(
   invoice: InvoiceWithItems,
-  pdfBuffer: Buffer,
+  pdfBuffer?: Buffer,
   portalLink = `${getWebBase()}/portal/invoice/${invoice.id}`
-): Promise<void> {
+): Promise<boolean> {
   if (!resend) {
     console.warn("RESEND_API_KEY missing: skipping invoice email send.");
-    return;
+    return false;
   }
 
   const total = formatCurrency(invoice.totalAmount, invoice.currencySymbol, invoice.currency);
@@ -50,19 +50,25 @@ export async function sendInvoiceEmail(
         </div>
       </div>
     `,
-    attachments: [
-      {
-        filename: `${invoice.invoiceNumber}.pdf`,
-        content: pdfBuffer.toString("base64")
-      }
-    ]
+    ...(pdfBuffer
+      ? {
+          attachments: [
+            {
+              filename: `${invoice.invoiceNumber}.pdf`,
+              content: pdfBuffer.toString("base64")
+            }
+          ]
+        }
+      : {})
   });
+
+  return true;
 }
 
-export async function sendInvoiceSignedNotifications(invoice: InvoiceWithItems): Promise<void> {
+export async function sendInvoiceSignedNotifications(invoice: InvoiceWithItems): Promise<boolean> {
   if (!resend) {
     console.warn("RESEND_API_KEY missing: skipping signed invoice notifications.");
-    return;
+    return false;
   }
 
   const total = formatCurrency(invoice.totalAmount, invoice.currencySymbol, invoice.currency);
@@ -90,4 +96,6 @@ export async function sendInvoiceSignedNotifications(invoice: InvoiceWithItems):
       html: sharedHtml
     })
   ]);
+
+  return true;
 }

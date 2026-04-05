@@ -126,9 +126,11 @@ function buildInvoiceHTML(invoice: InvoiceWithItems): string {
 }
 
 export async function generateInvoicePDF(invoice: InvoiceWithItems): Promise<Buffer> {
+  const executablePath = (process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || "").trim();
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    ...(executablePath ? { executablePath } : {})
   });
 
   try {

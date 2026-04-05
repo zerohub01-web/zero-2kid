@@ -360,15 +360,35 @@ export async function sendInvoice(req: Request, res: Response) {
     invoice.emailSentTo = invoice.clientEmail;
     await invoice.save();
 
-    const pdfBuffer = await generateInvoicePDF(toInvoiceWithItems(invoice));
-    const pdfUrl = await savePdf(String(invoice._id), pdfBuffer);
+    const warnings: string[] = [];
+    let pdfGenerated = false;
+    let emailSent = false;
+    let pdfBuffer: Buffer | undefined;
 
-    invoice.pdfUrl = pdfUrl;
-    await invoice.save();
+    try {
+      pdfBuffer = await generateInvoicePDF(toInvoiceWithItems(invoice));
+      const pdfUrl = await savePdf(String(invoice._id), pdfBuffer);
+
+      invoice.pdfUrl = pdfUrl;
+      await invoice.save();
+      pdfGenerated = true;
+    } catch (pdfError) {
+      warnings.push("pdf_generation_failed");
+      console.error("Send invoice PDF generation failed:", pdfError);
+    }
 
     const portalAccess = buildPortalAccess("invoice", String(invoice._id), getWebBase());
 
-    await sendInvoiceEmail(toInvoiceWithItems(invoice), pdfBuffer, portalAccess.portalLink);
+    try {
+      emailSent = await sendInvoiceEmail(toInvoiceWithItems(invoice), pdfBuffer, portalAccess.portalLink);
+      if (!emailSent) {
+        warnings.push("email_not_configured");
+      }
+    } catch (emailError) {
+      warnings.push("email_send_failed");
+      console.error("Send invoice email failed:", emailError);
+    }
+
     const whatsappText = buildInvoiceWhatsApp({
       id: String(invoice._id),
       clientName: invoice.clientName,
@@ -383,15 +403,24 @@ export async function sendInvoice(req: Request, res: Response) {
 
     return res.json({
       success: true,
-      pdfUrl: invoice.pdfUrl,
+      code: warnings.length > 0 ? "invoice_sent_with_warnings" : "invoice_sent",
+      warnings,
+      pdfGenerated,
+      emailSent,
+      pdfUrl: invoice.pdfUrl || null,
       portalLink: portalAccess.portalLink,
       status: invoice.status,
       whatsappUrl,
-      message: `Invoice sent to ${invoice.clientEmail}`
+      message: emailSent
+        ? `Invoice sent to ${invoice.clientEmail}`
+        : "Invoice marked as sent. Email delivery failed, use the portal/WhatsApp link."
     });
   } catch (error) {
     console.error("Send invoice failed:", error);
-    return res.status(500).json({ message: "Failed to send invoice" });
+    return res.status(500).json({
+      code: "invoice_send_failed",
+      message: "Failed to send invoice"
+    });
   }
 }
 
@@ -412,7 +441,19 @@ export async function signInvoice(req: Request, res: Response) {
     invoice.status = "SIGNED";
     await invoice.save();
 
-    await sendInvoiceSignedNotifications(toInvoiceWithItems(invoice));
+    const warnings: string[] = [];
+    let notificationsSent = false;
+
+    try {
+      notificationsSent = await sendInvoiceSignedNotifications(toInvoiceWithItems(invoice));
+      if (!notificationsSent) {
+        warnings.push("notification_email_not_configured");
+      }
+    } catch (notificationError) {
+      warnings.push("notification_email_failed");
+      console.error("Sign invoice notification email failed:", notificationError);
+    }
+
     const adminPhone = toDigits(process.env.ADMIN_NOTIFY_WHATSAPP || process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "919746927368");
     const webBase = (process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || process.env.CLIENT_ORIGIN || "http://localhost:3000").replace(/\/$/, "");
     const adminMessage =
@@ -427,6 +468,9 @@ export async function signInvoice(req: Request, res: Response) {
 
     return res.json({
       success: true,
+      code: warnings.length > 0 ? "invoice_signed_with_warnings" : "invoice_signed",
+      warnings,
+      notificationsSent,
       signedAt: invoice.signedAt,
       status: invoice.status,
       message: "Invoice signed successfully",
@@ -434,7 +478,10 @@ export async function signInvoice(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("Sign invoice failed:", error);
-    return res.status(500).json({ message: "Failed to sign invoice" });
+    return res.status(500).json({
+      code: "invoice_sign_failed",
+      message: "Failed to sign invoice"
+    });
   }
 }
 
