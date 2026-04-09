@@ -10,3 +10,6 @@ export const whatsappWebhookRouter = Router();
 whatsappWebhookRouter.get("/webhook/whatsapp", verifyWhatsAppWebhook);
 whatsappWebhookRouter.post("/webhook/whatsapp", whatsappWebhookLimiter, receiveWhatsAppWebhook);
 
+// Backward-compatible alias used by monitoring scripts/docs.
+whatsappWebhookRouter.get("/webhooks/whatsapp", verifyWhatsAppWebhook);
+whatsappWebhookRouter.post("/webhooks/whatsapp", whatsappWebhookLimiter, receiveWhatsAppWebhook);

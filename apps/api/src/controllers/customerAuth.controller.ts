@@ -7,6 +7,7 @@ import { signCustomerToken } from "../utils/customerAuth.js";
 import { env } from "../config/env.js";
 import { ensureTimelineForBooking } from "./projectTimeline.controller.js";
 import { sendVerificationEmail, sendWelcomeEmail } from "../services/email.service.js";
+import { sendLoginNotification } from "../services/whatsapp.service.js";
 import crypto from "crypto";
 import { verifyCustomerToken } from "../utils/customerAuth.js";
 
@@ -32,6 +33,26 @@ function setCustomerCookie(req: Request, res: Response, token: string) {
     sameSite: secureCookie ? "none" : "lax",
     maxAge: 1000 * 60 * 60 * 24 * 7
   });
+}
+
+async function triggerLoginWhatsAppNotification(customer: { email: string; name: string }) {
+  if (!env.whatsappApiEnabled) return;
+
+  try {
+    const recentBooking = await BookingModel.findOne({ email: customer.email.toLowerCase() })
+      .sort({ createdAt: -1 })
+      .select("phone name");
+
+    const phone = String(recentBooking?.phone ?? "").trim();
+    if (!phone) return;
+
+    const recipientName = String(recentBooking?.name ?? customer.name ?? "Customer").trim() || "Customer";
+
+    await sendLoginNotification({ phone, name: recipientName });
+    console.info(`[Auth] WhatsApp login notification sent to ${phone}`);
+  } catch (error) {
+    console.error(`[Auth] WhatsApp login notification failed for ${customer.email}:`, error);
+  }
 }
 
 export async function signupCustomer(req: Request, res: Response) {
@@ -88,6 +109,8 @@ export async function loginCustomer(req: Request, res: Response) {
   const token = signCustomerToken({ customerId: String(customer._id), email: customer.email });
   setCustomerCookie(req, res, token);
 
+  void triggerLoginWhatsAppNotification({ email: customer.email, name: customer.name });
+
   return res.json({ customer: { id: customer._id, name: customer.name, email: customer.email } });
 }
 
@@ -119,6 +142,8 @@ export async function loginWithGoogle(req: Request, res: Response) {
 
     const token = signCustomerToken({ customerId: String(customer._id), email: customer.email });
     setCustomerCookie(req, res, token);
+
+    void triggerLoginWhatsAppNotification({ email: customer.email, name: customer.name });
 
     return res.json({ customer: { id: customer._id, name: customer.name, email: customer.email } });
   } catch (err: any) {

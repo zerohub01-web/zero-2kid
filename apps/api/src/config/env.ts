@@ -5,6 +5,14 @@ dotenv.config();
 const cleanEnvValue = (value?: string, fallback = "") =>
   (value ?? fallback).trim().replace(/^['"]|['"]$/g, "");
 
+const parseBoolean = (value: string, fallback: boolean) => {
+  const normalized = cleanEnvValue(value).toLowerCase();
+  if (!normalized) return fallback;
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+};
+
 const rawGoogleClientId = process.env.GOOGLE_CLIENT_ID ?? "";
 const GOOGLE_CLIENT_ID = rawGoogleClientId.trim().replace(/^['"]|['"]$/g, "");
 
@@ -25,6 +33,25 @@ for (const key of required) {
   }
 }
 
+const metaAccessToken = cleanEnvValue(
+  process.env.META_ACCESS_TOKEN || process.env.META_WHATSAPP_TOKEN
+);
+const metaPhoneNumberId = cleanEnvValue(
+  process.env.META_PHONE_NUMBER_ID || process.env.META_WHATSAPP_PHONE_NUMBER_ID
+);
+const metaSenderNumber = cleanEnvValue(
+  process.env.WHATSAPP_BUSINESS_PHONE ||
+    process.env.META_WHATSAPP_SENDER_NUMBER ||
+    process.env.ADMIN_NOTIFY_WHATSAPP ||
+    process.env.NEXT_PUBLIC_ADMIN_WHATSAPP
+);
+const metaBusinessAccountId = cleanEnvValue(
+  process.env.META_BUSINESS_ACCOUNT_ID || process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID
+);
+const metaApiVersion = cleanEnvValue(process.env.META_API_VERSION, "v20.0");
+const metaWebhookUrl = cleanEnvValue(process.env.META_WEBHOOK_URL);
+const whatsappApiEnabled = parseBoolean(process.env.WHATSAPP_API_ENABLED || "true", true);
+
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   mongoUri: cleanEnvValue(process.env.MONGODB_URI)!,
@@ -36,9 +63,15 @@ export const env = {
   adminNotifyEmail: cleanEnvValue(process.env.ADMIN_NOTIFY_EMAIL, "admin@zero.local"),
   openaiApiKey: cleanEnvValue(process.env.OPENAI_API_KEY),
   openaiModel: cleanEnvValue(process.env.OPENAI_MODEL, "gpt-4o-mini"),
-  metaWhatsAppToken: cleanEnvValue(process.env.META_WHATSAPP_TOKEN),
-  metaWhatsAppPhoneNumberId: cleanEnvValue(process.env.META_WHATSAPP_PHONE_NUMBER_ID),
-  metaWhatsAppSenderNumber: cleanEnvValue(process.env.META_WHATSAPP_SENDER_NUMBER),
+  metaWhatsAppToken: metaAccessToken,
+  metaWhatsAppPhoneNumberId: metaPhoneNumberId,
+  metaWhatsAppSenderNumber: metaSenderNumber,
+  metaAccessToken,
+  metaPhoneNumberId,
+  metaBusinessAccountId,
+  metaApiVersion,
+  metaWebhookUrl,
+  whatsappApiEnabled,
   metaWebhookVerifyToken: cleanEnvValue(process.env.META_WEBHOOK_VERIFY_TOKEN || process.env.WHATSAPP_VERIFY_TOKEN),
   metaAppSecret: cleanEnvValue(process.env.META_APP_SECRET),
   recaptchaSecretKey: cleanEnvValue(process.env.RECAPTCHA_SECRET_KEY),

@@ -35,3 +35,19 @@ services:
         value: https://zeroops.in
       - key: GOOGLE_CLIENT_ID
         value: 784883477395-40ivk4ogpdkqq20rlebrb9vknvifaop6.apps.googleusercontent.com
+      - key: META_API_VERSION
+        value: v20.0
+      - key: META_BUSINESS_ACCOUNT_ID
+        sync: false
+      - key: META_PHONE_NUMBER_ID
+        sync: false
+      - key: META_ACCESS_TOKEN
+        sync: false
+      - key: META_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: META_WEBHOOK_URL
+        value: https://zero-api-m0an.onrender.com/webhooks/whatsapp
+      - key: WHATSAPP_BUSINESS_PHONE
+        value: "+919746927368"
+      - key: WHATSAPP_API_ENABLED
+        value: "true"

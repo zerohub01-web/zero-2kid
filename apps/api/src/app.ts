@@ -17,6 +17,7 @@ import { whatsappWebhookRouter } from "./routes/whatsapp.webhook.js";
 import { invoiceRouter } from "./routes/invoice.routes.js";
 import { contractRouter } from "./routes/contract.routes.js";
 import { proposalRouter } from "./routes/proposal.routes.js";
+import { getWhatsAppAutomationStatus } from "./services/whatsapp.service.js";
 
 type RequestWithRawBody = express.Request & { rawBody?: string };
 
@@ -86,6 +87,9 @@ app.get("/", (_req, res) =>
 
 const healthHandler: express.RequestHandler = async (_req, res) => {
   const timestamp = new Date().toISOString();
+  let db: "connected" | "disconnected" = "connected";
+  let status: "ok" | "degraded" = "ok";
+  let dbError: string | undefined;
 
   try {
     if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
@@ -93,19 +97,41 @@ const healthHandler: express.RequestHandler = async (_req, res) => {
     }
 
     await mongoose.connection.db.admin().ping();
-    return res.status(200).json({
-      status: "ok",
-      timestamp,
-      db: "connected"
-    });
   } catch (error) {
-    return res.status(503).json({
-      status: "degraded",
-      timestamp,
-      db: "disconnected",
-      error: error instanceof Error ? error.message : "db-unavailable"
-    });
+    db = "disconnected";
+    status = "degraded";
+    dbError = error instanceof Error ? error.message : "db-unavailable";
   }
+
+  let whatsappStatus: "connected" | "degraded" | "disconnected" = "disconnected";
+  let whatsappWarnings: string[] = [];
+
+  try {
+    const whatsapp = await getWhatsAppAutomationStatus();
+    if (whatsapp.canSend) {
+      whatsappStatus = "connected";
+    } else if (whatsapp.configured) {
+      whatsappStatus = "degraded";
+    } else {
+      whatsappStatus = "disconnected";
+    }
+    whatsappWarnings = whatsapp.warnings;
+  } catch (error) {
+    status = "degraded";
+    whatsappStatus = "degraded";
+    whatsappWarnings = [
+      `WhatsApp status check failed: ${error instanceof Error ? error.message : "unknown-error"}`
+    ];
+  }
+
+  return res.status(200).json({
+    status,
+    timestamp,
+    db,
+    ...(dbError ? { error: dbError } : {}),
+    whatsappStatus,
+    ...(whatsappWarnings.length ? { whatsappWarnings } : {})
+  });
 };
 
 app.get("/health", healthHandler);

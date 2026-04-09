@@ -3,7 +3,11 @@ import { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { appendInboundChatMessage, appendOutboundChatMessage } from "../services/chat.service.js";
 import { generateReply } from "../services/whatsappAi.service.js";
-import { getWhatsAppAutomationStatus, sendWhatsAppMessage } from "../services/whatsapp.service.js";
+import {
+  WhatsAppError,
+  getWhatsAppAutomationStatus,
+  sendWhatsAppMessage
+} from "../services/whatsapp.service.js";
 import { sanitizeMultiline } from "../utils/sanitize.js";
 import { enqueueWhatsAppJob } from "../services/whatsappQueue.service.js";
 
@@ -125,17 +129,33 @@ async function handleIncomingMessage(message: IncomingWhatsAppMessage) {
 }
 
 export async function sendWhatsAppFromApi(req: Request, res: Response) {
-  const phone = String(req.body.phone ?? "");
-  const message = String(req.body.message ?? "");
+  try {
+    const phone = String(req.body.phone ?? "");
+    const message = String(req.body.message ?? "");
 
-  await sendWhatsAppMessage({ phone, message });
-  await appendOutboundChatMessage({
-    phone,
-    message,
-    source: "admin"
-  });
+    await sendWhatsAppMessage({ phone, message });
+    await appendOutboundChatMessage({
+      phone,
+      message,
+      source: "admin"
+    });
 
-  return res.json({ ok: true });
+    return res.json({ ok: true });
+  } catch (error) {
+    if (error instanceof WhatsAppError) {
+      return res.status(error.statusCode).json({
+        ok: false,
+        error: error.message,
+        ...(typeof error.metaCode === "number" ? { metaCode: error.metaCode } : {})
+      });
+    }
+
+    const message = error instanceof Error ? error.message : "Unexpected WhatsApp send error.";
+    return res.status(500).json({
+      ok: false,
+      error: message
+    });
+  }
 }
 
 export async function getWhatsAppStatus(_req: Request, res: Response) {

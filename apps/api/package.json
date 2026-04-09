@@ -9,6 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seed.ts",
+    "verify:whatsapp": "node scripts/verify-meta-whatsapp.mjs",
+    "smoke:whatsapp": "node scripts/whatsapp-smoke-check.mjs",
     "lint": "eslint . --ext .ts",
     "test:unit": "vitest run tests/unit --pool=threads",
     "test:api": "node test-results/api-tests.mjs"
