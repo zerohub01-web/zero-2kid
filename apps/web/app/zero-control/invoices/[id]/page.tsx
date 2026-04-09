@@ -81,7 +81,6 @@ interface InvoiceApiResponse {
 
 interface SendInvoiceResponse {
   success?: boolean;
-  whatsappUrl?: string;
   portalLink?: string;
   message?: string;
 }
@@ -89,7 +88,6 @@ interface SendInvoiceResponse {
 interface SentModalState {
   email: string;
   phone: string;
-  whatsappUrl: string;
   portalLink: string;
 }
 
@@ -187,7 +185,6 @@ export default function InvoiceEditorPage() {
   const [sentModalData, setSentModalData] = useState<SentModalState>({
     email: "",
     phone: "",
-    whatsappUrl: "",
     portalLink: ""
   });
   const [saveDefaults, setSaveDefaults] = useState(false);
@@ -607,15 +604,10 @@ export default function InvoiceEditorPage() {
       setForm((prev) => ({ ...prev, status: "SENT" }));
       toast.success(`\u2705 Invoice sent to ${form.clientEmail}`);
 
-      if (data.whatsappUrl) {
-        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
-      }
-
       setShowSentModal(true);
       setSentModalData({
         email: form.clientEmail,
         phone: form.clientPhone,
-        whatsappUrl: data.whatsappUrl || "",
         portalLink: data.portalLink || `${getWebBase()}/portal/invoice/${id}`
       });
     } catch (error) {
@@ -698,12 +690,12 @@ export default function InvoiceEditorPage() {
         <div>
           <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)] mb-2">Client Details</p>
           <div className="grid gap-3">
-            <input className="field py-2.5" placeholder="Client Name" value={form.clientName} onChange={(e) => setField("clientName", e.target.value)} />
-            <input className="field py-2.5" placeholder="Client Email" value={form.clientEmail} onChange={(e) => setField("clientEmail", e.target.value)} />
-            <input className="field py-2.5" placeholder="Client Phone" value={form.clientPhone} onChange={(e) => setField("clientPhone", e.target.value)} />
-            <input className="field py-2.5" placeholder="Business Name" value={form.clientBusiness} onChange={(e) => setField("clientBusiness", e.target.value)} />
+            <input className="field py-2.5" autoComplete="name" placeholder="Client Name" value={form.clientName} onChange={(e) => setField("clientName", e.target.value)} />
+            <input type="email" inputMode="email" autoComplete="email" className="field py-2.5" placeholder="Client Email" value={form.clientEmail} onChange={(e) => setField("clientEmail", e.target.value)} />
+            <input type="tel" inputMode="tel" autoComplete="tel" className="field py-2.5" placeholder="Client Phone" value={form.clientPhone} onChange={(e) => setField("clientPhone", e.target.value)} />
+            <input className="field py-2.5" autoComplete="organization" placeholder="Business Name" value={form.clientBusiness} onChange={(e) => setField("clientBusiness", e.target.value)} />
             <input className="field py-2.5" placeholder="Address" value={form.clientAddress} onChange={(e) => setField("clientAddress", e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 md:grid-cols-2">
               <input className="field py-2.5" placeholder="GST Number" value={form.clientGST} onChange={(e) => setField("clientGST", e.target.value)} />
               <input className="field py-2.5" placeholder="Location (IN / US...)" value={form.clientLocation} onChange={(e) => setField("clientLocation", e.target.value)} />
             </div>
@@ -714,6 +706,7 @@ export default function InvoiceEditorPage() {
                   type="text"
                   placeholder="Enter booking ID to prefill"
                   value={bookingIdInput}
+                  inputMode="text"
                   onChange={(event) => setBookingIdInput(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
@@ -745,7 +738,7 @@ export default function InvoiceEditorPage() {
           <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)] mb-2">Invoice Settings</p>
           <div className="grid gap-3">
             <input className="field py-2.5" placeholder="Invoice Number (auto if blank)" value={form.invoiceNumber} onChange={(e) => setField("invoiceNumber", e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 md:grid-cols-2">
               <label className="grid gap-1 text-xs text-[var(--muted)]">
                 Due Date
                 <input type="date" className="field py-2.5" value={form.dueDate} onChange={(e) => setField("dueDate", e.target.value)} />
@@ -755,7 +748,7 @@ export default function InvoiceEditorPage() {
                 <input type="date" className="field py-2.5" value={form.validUntil} onChange={(e) => setField("validUntil", e.target.value)} />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 md:grid-cols-2">
               <input className="field py-2.5" placeholder="Currency" value={form.currency} onChange={(e) => setField("currency", e.target.value)} />
               <input className="field py-2.5" placeholder="Symbol" value={form.currencySymbol} onChange={(e) => setField("currencySymbol", e.target.value)} />
             </div>
@@ -814,7 +807,7 @@ export default function InvoiceEditorPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full text-sm">
             <thead className="border-b border-black/10">
               <tr>
                 <th className="py-2 text-left">Category</th>
@@ -853,6 +846,7 @@ export default function InvoiceEditorPage() {
                     <td className="py-2">
                       <input
                         type="number"
+                        inputMode="numeric"
                         min={1}
                         className="field py-2"
                         value={item.quantity}
@@ -862,6 +856,7 @@ export default function InvoiceEditorPage() {
                     <td className="py-2">
                       <input
                         type="number"
+                        inputMode="decimal"
                         min={0}
                         className="field py-2"
                         value={item.unitPrice}
@@ -891,7 +886,7 @@ export default function InvoiceEditorPage() {
           <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)] mb-2">Payment Details</p>
           <div className="grid gap-3">
             <input className="field py-2.5" placeholder="Bank Name" value={form.bankName} onChange={(e) => setField("bankName", e.target.value)} />
-            <input className="field py-2.5" placeholder="Account Number" value={form.accountNumber} onChange={(e) => setField("accountNumber", e.target.value)} />
+            <input inputMode="numeric" className="field py-2.5" placeholder="Account Number" value={form.accountNumber} onChange={(e) => setField("accountNumber", e.target.value)} />
             <input className="field py-2.5" placeholder="IFSC" value={form.ifscCode} onChange={(e) => setField("ifscCode", e.target.value)} />
             <input className="field py-2.5" placeholder="UPI ID" value={form.upiId} onChange={(e) => setField("upiId", e.target.value)} />
             <label className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
@@ -998,13 +993,7 @@ export default function InvoiceEditorPage() {
                   <div className="channel-label">WhatsApp notification</div>
                   <div className="channel-detail">{sentModalData.phone}</div>
                 </div>
-                {sentModalData.whatsappUrl ? (
-                  <a href={sentModalData.whatsappUrl} target="_blank" rel="noopener noreferrer" className="channel-open-btn">
-                    Open WhatsApp \u2197
-                  </a>
-                ) : (
-                  <span className="channel-check">\u2713</span>
-                )}
+                <span className="channel-check">\u2713</span>
               </div>
 
               <div className="sent-channel">

@@ -7,8 +7,7 @@ import { detectCurrency } from "../utils/currency.js";
 import { generateInvoicePDF, type InvoiceWithItems } from "../utils/generateInvoicePDF.js";
 import { buildPortalAccess } from "../utils/portalToken.js";
 import { sendInvoiceEmail, sendInvoiceSignedNotifications } from "../services/invoiceEmail.js";
-import { sendWhatsAppMessage } from "../services/whatsapp.service.js";
-import { buildInvoiceWhatsApp } from "../utils/whatsappMessages.js";
+import { sendHeadlessInvoice, sendWhatsAppMessage } from "../services/whatsapp.service.js";
 
 const INVOICE_STORAGE_DIR = path.join(process.cwd(), "storage", "invoices");
 
@@ -61,16 +60,6 @@ function text(value: unknown): string {
 function getWebBase(): string {
   const direct = process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || process.env.CLIENT_ORIGIN;
   return (direct || "http://localhost:3000").replace(/\/$/, "");
-}
-
-function toDigits(value: string): string {
-  return text(value).replace(/\D/g, "");
-}
-
-function buildWaUrl(phone: string, message: string): string | null {
-  const cleanPhone = toDigits(phone);
-  if (!cleanPhone) return null;
-  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
 
 function normalizeItems(items: InvoiceItemInput[] = []): InvoiceItem[] {
@@ -391,22 +380,15 @@ export async function sendInvoice(req: Request, res: Response) {
       console.error("Send invoice email failed:", emailError);
     }
 
-    const whatsappText = buildInvoiceWhatsApp({
-      id: String(invoice._id),
-      clientName: invoice.clientName,
-      invoiceNumber: invoice.invoiceNumber,
-      currencySymbol: invoice.currencySymbol,
-      totalAmount: Number(invoice.totalAmount || 0),
-      dueDate: invoice.dueDate,
-      upiId: invoice.upiId,
-      portalLink: portalAccess.portalLink
-    });
-    const whatsappUrl = buildWaUrl(invoice.clientPhone, whatsappText);
-    if (whatsappUrl) {
+    if (text(invoice.clientPhone)) {
       try {
-        await sendWhatsAppMessage({
-          phone: invoice.clientPhone,
-          message: whatsappText
+        await sendHeadlessInvoice(invoice.clientPhone, {
+          invoiceNumber: invoice.invoiceNumber,
+          clientName: invoice.clientName,
+          totalAmount: Number(invoice.totalAmount || 0),
+          currencySymbol: invoice.currencySymbol,
+          dueDate: invoice.dueDate,
+          portalLink: portalAccess.portalLink
         });
         whatsappSent = true;
       } catch (whatsappError) {
@@ -427,10 +409,9 @@ export async function sendInvoice(req: Request, res: Response) {
       pdfUrl: invoice.pdfUrl || null,
       portalLink: portalAccess.portalLink,
       status: invoice.status,
-      whatsappUrl,
       message: emailSent || whatsappSent
         ? `Invoice sent to ${invoice.clientEmail}`
-        : "Invoice marked as sent. Email delivery failed, use the portal/WhatsApp link."
+        : "Invoice marked as sent. Email and WhatsApp delivery failed."
     });
   } catch (error) {
     console.error("Send invoice failed:", error);
@@ -471,27 +452,41 @@ export async function signInvoice(req: Request, res: Response) {
       console.error("Sign invoice notification email failed:", notificationError);
     }
 
-    const adminPhone = toDigits(process.env.ADMIN_NOTIFY_WHATSAPP || process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "919746927368");
-    const webBase = (process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || process.env.CLIENT_ORIGIN || "http://localhost:3000").replace(/\/$/, "");
-    const adminMessage =
-      `\u2705 *Invoice Signed - ZERO OPS*\n` +
-      `${"\u2501".repeat(15)}\n` +
-      `Client: ${invoice.clientName}\n` +
-      `Invoice: ${invoice.invoiceNumber}\n` +
-      `Amount: ${invoice.currencySymbol}${Number(invoice.totalAmount || 0).toLocaleString("en-IN")}\n` +
-      `Signed at: ${new Date(invoice.signedAt || new Date()).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}\n` +
-      `\u{1F9FE} View: ${webBase}/zero-control/invoices/${String(invoice._id)}/view`;
-    const adminWhatsappAlert = `https://wa.me/${adminPhone}?text=${encodeURIComponent(adminMessage)}`;
+    let adminWhatsappSent = false;
+    const adminPhone = text(process.env.ADMIN_NOTIFY_WHATSAPP || process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "");
+    if (adminPhone) {
+      try {
+        const webBase = (process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || process.env.CLIENT_ORIGIN || "http://localhost:3000").replace(/\/$/, "");
+        const adminMessage =
+          `Invoice signed: ${invoice.invoiceNumber}\n` +
+          `Client: ${invoice.clientName}\n` +
+          `Amount: ${invoice.currencySymbol}${Number(invoice.totalAmount || 0).toLocaleString("en-IN")}\n` +
+          `Signed at: ${new Date(invoice.signedAt || new Date()).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}\n` +
+          `View: ${webBase}/zero-control/invoices/${String(invoice._id)}/view`;
+
+        await sendWhatsAppMessage({
+          phone: adminPhone,
+          message: adminMessage,
+          allowTemplateFallback: true
+        });
+        adminWhatsappSent = true;
+      } catch (whatsappError) {
+        warnings.push("notification_whatsapp_failed");
+        console.error("Sign invoice admin WhatsApp failed:", whatsappError);
+      }
+    } else {
+      warnings.push("notification_whatsapp_phone_missing");
+    }
 
     return res.json({
       success: true,
       code: warnings.length > 0 ? "invoice_signed_with_warnings" : "invoice_signed",
       warnings,
       notificationsSent,
+      adminWhatsappSent,
       signedAt: invoice.signedAt,
       status: invoice.status,
-      message: "Invoice signed successfully",
-      adminWhatsappAlert
+      message: "Invoice signed successfully"
     });
   } catch (error) {
     console.error("Sign invoice failed:", error);

@@ -64,16 +64,6 @@ function text(value: unknown): string {
   return String(value ?? "").trim();
 }
 
-function toDigits(value: string): string {
-  return text(value).replace(/\D/g, "");
-}
-
-function buildWaUrl(phone: string, message: string): string | null {
-  const cleanPhone = toDigits(phone);
-  if (!cleanPhone) return null;
-  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-}
-
 function numberOrZero(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
@@ -263,36 +253,18 @@ function getWebBase(): string {
   return (process.env.NEXT_PUBLIC_WEB_URL ?? process.env.WEB_URL ?? envClientFallback()).replace(/\/$/, "");
 }
 
-async function sendAdminSignedWhatsApp(contract: ContractDocument): Promise<void> {
+async function sendAdminSignedWhatsApp(contract: ContractDocument): Promise<boolean> {
   const adminPhone = text(process.env.ADMIN_NOTIFY_WHATSAPP || process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "");
   if (!adminPhone) {
-    return;
+    return false;
   }
 
-  try {
-    await sendWhatsAppMessage({
-      phone: adminPhone,
-      message: buildAdminReminderText(contract)
-    });
-  } catch (error) {
-    console.error("Failed to send contract signed WhatsApp notification:", error);
-  }
-}
-
-function buildAdminSignedWhatsappUrl(contract: ContractDocument): string {
-  const adminPhone = toDigits(process.env.ADMIN_NOTIFY_WHATSAPP || process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "919746927368");
-  const webBase = (process.env.NEXT_PUBLIC_WEB_URL || process.env.WEB_URL || envClientFallback()).replace(/\/$/, "");
-  const signedAtText = new Date(contract.clientSignedAt || new Date()).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
-  const body =
-    `\u2705 *Contract Signed - ZERO OPS*\n` +
-    `${"\u2501".repeat(15)}\n` +
-    `Client: ${contract.clientName}\n` +
-    `Contract: ${contract.contractNumber}\n` +
-    `Service: ${contract.serviceType}\n` +
-    `Signed at: ${signedAtText}\n` +
-    `\u{1F4CB} View: ${webBase}/zero-control/contracts/${String(contract._id)}/view`;
-
-  return `https://wa.me/${adminPhone}?text=${encodeURIComponent(body)}`;
+  await sendWhatsAppMessage({
+    phone: adminPhone,
+    message: buildAdminReminderText(contract),
+    allowTemplateFallback: true
+  });
+  return true;
 }
 
 export async function listContracts(req: Request, res: Response) {
@@ -573,12 +545,12 @@ export async function sendContract(req: Request, res: Response) {
       currencySymbol: contract.currencySymbol,
       portalLink: portalAccess.portalLink
     });
-    const whatsappUrl = buildWaUrl(contract.clientPhone, whatsappText);
-    if (whatsappUrl) {
+    if (text(contract.clientPhone)) {
       try {
         await sendWhatsAppMessage({
           phone: contract.clientPhone,
-          message: whatsappText
+          message: whatsappText,
+          allowTemplateFallback: true
         });
         whatsappSent = true;
       } catch (whatsappError) {
@@ -599,10 +571,9 @@ export async function sendContract(req: Request, res: Response) {
       pdfUrl: contract.pdfUrl || null,
       portalLink: portalAccess.portalLink,
       status: contract.status,
-      whatsappUrl,
       message: emailSent || whatsappSent
         ? `Contract sent to ${contract.clientEmail}`
-        : "Contract marked as sent. Email delivery failed, use the portal/WhatsApp link."
+        : "Contract marked as sent. Email and WhatsApp delivery failed."
     });
   } catch (error) {
     console.error("Send contract failed:", error);
@@ -657,14 +628,16 @@ export async function signContract(req: Request, res: Response) {
       console.error("Sign contract notification email failed:", notificationError);
     }
 
+    let adminWhatsAppSent = false;
     try {
-      await sendAdminSignedWhatsApp(contract);
+      adminWhatsAppSent = await sendAdminSignedWhatsApp(contract);
+      if (!adminWhatsAppSent) {
+        warnings.push("notification_whatsapp_phone_missing");
+      }
     } catch (whatsAppError) {
       warnings.push("notification_whatsapp_failed");
       console.error("Sign contract admin WhatsApp failed:", whatsAppError);
     }
-
-    const adminWhatsappAlert = buildAdminSignedWhatsappUrl(contract);
 
     return res.json({
       success: true,
@@ -672,11 +645,11 @@ export async function signContract(req: Request, res: Response) {
       warnings,
       pdfGenerated,
       notificationsSent,
+      adminWhatsAppSent,
       signedAt: contract.clientSignedAt,
       status: contract.status,
       pdfUrl: contract.pdfUrl || null,
-      message: "Contract signed successfully",
-      adminWhatsappAlert
+      message: "Contract signed successfully"
     });
   } catch (error) {
     console.error("Sign contract failed:", error);

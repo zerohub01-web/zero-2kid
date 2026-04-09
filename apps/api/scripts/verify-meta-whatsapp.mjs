@@ -16,7 +16,7 @@ const envValue = (...keys) => {
   return "";
 };
 
-const apiVersion = envValue("META_API_VERSION") || "v20.0";
+const apiVersion = envValue("META_API_VERSION") || "v18.0";
 const businessAccountId = envValue("META_BUSINESS_ACCOUNT_ID", "META_WHATSAPP_BUSINESS_ACCOUNT_ID");
 const phoneNumberId = envValue("META_PHONE_NUMBER_ID", "META_WHATSAPP_PHONE_NUMBER_ID");
 const accessToken = envValue("META_ACCESS_TOKEN", "META_WHATSAPP_TOKEN");

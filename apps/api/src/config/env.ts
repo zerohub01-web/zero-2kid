@@ -48,7 +48,7 @@ const metaSenderNumber = cleanEnvValue(
 const metaBusinessAccountId = cleanEnvValue(
   process.env.META_BUSINESS_ACCOUNT_ID || process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID
 );
-const metaApiVersion = cleanEnvValue(process.env.META_API_VERSION, "v20.0");
+const metaApiVersion = cleanEnvValue(process.env.META_API_VERSION, "v18.0");
 const metaWebhookUrl = cleanEnvValue(process.env.META_WEBHOOK_URL);
 const whatsappApiEnabled = parseBoolean(process.env.WHATSAPP_API_ENABLED || "true", true);
 

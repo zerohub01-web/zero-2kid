@@ -69,7 +69,6 @@ interface ContractSettings {
 
 interface SendContractResponse {
   success?: boolean;
-  whatsappUrl?: string;
   portalLink?: string;
   message?: string;
 }
@@ -77,7 +76,6 @@ interface SendContractResponse {
 interface SentModalState {
   email: string;
   phone: string;
-  whatsappUrl: string;
   portalLink: string;
 }
 
@@ -130,7 +128,6 @@ export default function ContractEditorPage() {
   const [sentModalData, setSentModalData] = useState<SentModalState>({
     email: "",
     phone: "",
-    whatsappUrl: "",
     portalLink: ""
   });
   const [bookingLookup, setBookingLookup] = useState("");
@@ -379,15 +376,10 @@ export default function ContractEditorPage() {
       setForm((prev) => ({ ...prev, status: "SENT" }));
       toast.success(`\u2705 Contract sent to ${form.clientEmail}`);
 
-      if (data.whatsappUrl) {
-        window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
-      }
-
       setShowSentModal(true);
       setSentModalData({
         email: form.clientEmail,
         phone: form.clientPhone,
-        whatsappUrl: data.whatsappUrl || "",
         portalLink: data.portalLink || `${getWebBase()}/portal/contract/${id}`
       });
     } catch (error) {
@@ -476,12 +468,12 @@ export default function ContractEditorPage() {
           <article className="soft-card p-6">
             <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)] mb-2">Client Details</p>
             <div className="grid gap-3">
-              <input className="field py-2.5" placeholder="Client Full Name *" value={form.clientName} onChange={(event) => setField("clientName", event.target.value)} />
+              <input className="field py-2.5" placeholder="Client Full Name *" autoComplete="name" value={form.clientName} onChange={(event) => setField("clientName", event.target.value)} />
               <div className="grid md:grid-cols-2 gap-3">
-                <input className="field py-2.5" placeholder="Client Email *" value={form.clientEmail} onChange={(event) => setField("clientEmail", event.target.value)} />
-                <input className="field py-2.5" placeholder="Client Phone *" value={form.clientPhone} onChange={(event) => setField("clientPhone", event.target.value)} />
+                <input type="email" inputMode="email" autoComplete="email" className="field py-2.5" placeholder="Client Email *" value={form.clientEmail} onChange={(event) => setField("clientEmail", event.target.value)} />
+                <input type="tel" inputMode="tel" autoComplete="tel" className="field py-2.5" placeholder="Client Phone *" value={form.clientPhone} onChange={(event) => setField("clientPhone", event.target.value)} />
               </div>
-              <input className="field py-2.5" placeholder="Client Business Name *" value={form.clientBusiness} onChange={(event) => setField("clientBusiness", event.target.value)} />
+              <input className="field py-2.5" placeholder="Client Business Name *" autoComplete="organization" value={form.clientBusiness} onChange={(event) => setField("clientBusiness", event.target.value)} />
               <textarea className="field min-h-[90px] py-2.5" placeholder="Client Full Address *" value={form.clientAddress} onChange={(event) => setField("clientAddress", event.target.value)} />
               <div className="grid md:grid-cols-2 gap-3">
                 <input className="field py-2.5" placeholder="City" value={form.clientCity} onChange={(event) => setField("clientCity", event.target.value)} />
@@ -491,7 +483,7 @@ export default function ContractEditorPage() {
               <div className="rounded-xl border border-black/10 bg-white/70 p-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)] mb-2">Linked Booking</p>
                 <div className="flex flex-wrap gap-2">
-                  <input className="field py-2.5 flex-1 min-w-[220px]" placeholder="Enter booking ID to prefill" value={bookingLookup} onChange={(event) => setBookingLookup(event.target.value)} />
+                  <input className="field w-full py-2.5 md:flex-1 md:min-w-[220px]" placeholder="Enter booking ID to prefill" value={bookingLookup} onChange={(event) => setBookingLookup(event.target.value)} />
                   <button type="button" onClick={() => void prefillFromBooking()} className="btn-secondary px-4 py-2.5 text-sm whitespace-nowrap">
                     Prefill from Booking
                   </button>
@@ -541,8 +533,8 @@ export default function ContractEditorPage() {
           <article className="soft-card p-6">
             <p className="text-xs uppercase tracking-[0.12em] text-[var(--muted)] mb-2">Financial Details</p>
             <div className="grid md:grid-cols-2 gap-3">
-              <input type="number" min={0} className="field py-2.5" placeholder="Advance Amount" value={form.advanceAmount} onChange={(event) => setField("advanceAmount", Number(event.target.value) || 0)} />
-              <input type="number" min={0} className="field py-2.5" placeholder="Total Project Value" value={form.totalAmount} onChange={(event) => setField("totalAmount", Number(event.target.value) || 0)} />
+              <input type="number" inputMode="decimal" min={0} className="field py-2.5" placeholder="Advance Amount" value={form.advanceAmount} onChange={(event) => setField("advanceAmount", Number(event.target.value) || 0)} />
+              <input type="number" inputMode="decimal" min={0} className="field py-2.5" placeholder="Total Project Value" value={form.totalAmount} onChange={(event) => setField("totalAmount", Number(event.target.value) || 0)} />
             </div>
 
             <div className="grid md:grid-cols-2 gap-3 mt-3">
@@ -721,13 +713,7 @@ export default function ContractEditorPage() {
                   <div className="channel-label">WhatsApp notification</div>
                   <div className="channel-detail">{sentModalData.phone}</div>
                 </div>
-                {sentModalData.whatsappUrl ? (
-                  <a href={sentModalData.whatsappUrl} target="_blank" rel="noopener noreferrer" className="channel-open-btn">
-                    Open WhatsApp \u2197
-                  </a>
-                ) : (
-                  <span className="channel-check">\u2713</span>
-                )}
+                <span className="channel-check">\u2713</span>
               </div>
 
               <div className="sent-channel">
